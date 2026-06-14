@@ -1,0 +1,30 @@
+#!/bin/sh
+# Enforces: #type : description
+# Examples: #feature : add flight search screen
+#           #fix : resolve OTP timer reset bug
+
+commit_msg=$(cat "$1")
+
+# Allow merge commits and WIP commits through
+if echo "$commit_msg" | grep -qE "^Merge |^WIP"; then
+  exit 0
+fi
+
+pattern="^#[a-zA-Z]+ : .{5,}"
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+  echo ""
+  echo "  [REJECTED] Commit message does not follow the convention."
+  echo ""
+  echo "  Required format : #type : description"
+  echo "  Examples        : #feature : add flight search screen"
+  echo "                    #fix : resolve OTP timer reset bug"
+  echo "                    #refactor : extract booking repository"
+  echo "                    #chore : update dependencies"
+  echo ""
+  echo "  Your message was: $commit_msg"
+  echo ""
+  exit 1
+fi
+
+exit 0
