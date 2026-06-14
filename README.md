@@ -31,12 +31,15 @@ All items must be green before proceeding.
 
 ---
 
-### 2. Clone the Repository
+### 2. Clone & Set Up Git Hooks
 
 ```bash
 git clone https://github.com/VIKRAM-CHOUDHARY-01/GenFly.git
 cd GenFly
+sh .githooks/setup.sh
 ```
+
+The setup script points Git at `.githooks/` and makes the hooks executable. This enforces branch naming and commit message conventions automatically — **run it once after cloning**.
 
 ---
 
@@ -59,119 +62,45 @@ Claude will automatically load `CLAUDE.md` from the project root — no manual s
 
 ---
 
-### 4. Install Flutter Dependencies
-
-```bash
-flutter pub get
-```
-
----
-
-### 5. Firebase Setup
-
-This project uses Firebase. You need the `google-services.json` file — **this is not in the repo for security reasons.**
-
-- Ask the project lead to share it with you
-- Place it at: `android/app/google-services.json`
-- Never commit this file (it is already in `.gitignore`)
-
----
-
-### 6. Environment Variables
-
-Copy the example env file and fill in your values:
-
-```bash
-cp .env.example .env
-```
-
-Ask the project lead for API keys. Never commit `.env`.
-
----
-
-### 7. Run the App
-
-Connect your Android phone via USB and enable USB Debugging, then:
-
-```bash
-flutter run
-```
-
-> **Note:** Prefer a real device over an emulator — emulators are slow on 8GB RAM machines.
-
----
-
-### 8. Branch Strategy
+### 4. Branch Strategy
 
 | Branch | Purpose |
 |---|---|
 | `main` | Production-ready code only |
-| `feature/auth` | Auth module |
-| `feature/search` | Flight search |
-| `feature/booking` | Booking flow |
-| `feature/payment` | Payment integration |
+| `feature/01/flightSearch` | Feature branches |
+| `fix/42/otpTimerReset` | Bug-fix branches |
+| `refactor/07/bookingRepository` | Refactor branches |
+
+Format: `type/number/camelCaseTitle`
+Allowed types: `feature`, `fix`, `refactor`, `chore`, `docs`, `test`
 
 Always create a feature branch. Never push directly to `main`.
 
 ```bash
-git checkout -b feature/your-feature-name
+git checkout -b feature/01/flightSearch
 ```
 
 ---
 
-### 9. Commit Message Convention
+### 5. Commit Message Convention
+
+Format: `#type : short description`
 
 ```
-feat: add flight search screen
-fix: resolve OTP timer reset bug
-refactor: extract booking repository
-chore: update flutter dependencies
+#feature : add flight search screen
+#fix : resolve OTP timer reset bug
+#refactor : extract booking repository
+#chore : update flutter dependencies
 ```
+
+Both conventions are enforced by Git hooks (set up in step 2).
 
 ---
 
-### 10. PR Rules
+### 6. PR Rules
 
 - PRs must be reviewed by at least one other developer before merging
-- All tests must pass before merging
 - `main` branch = production-ready only
-
----
-
-## Project Structure
-
-```
-lib/
-├── core/                  # Shared utilities, theme, constants, errors
-├── features/
-│   ├── auth/
-│   │   ├── data/          # API, models, repository implementations
-│   │   ├── domain/        # Entities, use cases, repository interfaces
-│   │   └── presentation/  # BLoC, screens, widgets
-│   ├── search/
-│   ├── booking/
-│   ├── payment/
-│   ├── ticket/
-│   ├── profile/
-│   └── notifications/
-└── main.dart
-```
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Language | Dart |
-| Framework | Flutter (Material 3) |
-| Architecture | Clean Architecture + BLoC |
-| State Management | flutter_bloc |
-| Navigation | GoRouter |
-| Networking | Dio |
-| Auth | Firebase Auth |
-| Notifications | Firebase FCM |
-| Payment | Razorpay |
 
 ---
 
