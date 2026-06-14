@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../../core/theme/app_theme.dart';
-import '../../../../home/presentation/screens/home_screen.dart';
+import '../../../../../core/widgets/coming_soon_body.dart';
 
 class BookingsScreen extends StatelessWidget {
   const BookingsScreen({super.key});
@@ -9,7 +8,7 @@ class BookingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('My Bookings')),
-      body: const _ComingSoonBody(
+      body: const ComingSoonBody(
         icon: Icons.book_rounded,
         title: 'My Bookings',
         subtitle: 'View upcoming trips, past flights\nand manage your reservations.',
