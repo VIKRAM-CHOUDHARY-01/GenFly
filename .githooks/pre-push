@@ -1,0 +1,32 @@
+#!/bin/sh
+# Enforces branch naming: type/number/title
+# Examples: feature/01/flightSearch
+#           fix/42/otpTimerReset
+#           refactor/07/bookingRepository
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+
+# Allow main and develop branches through
+if echo "$branch" | grep -qE "^(main|develop|HEAD)$"; then
+  exit 0
+fi
+
+pattern="^(feature|fix|refactor|chore|docs|test)/[0-9]+/[a-zA-Z0-9][a-zA-Z0-9-]*$"
+
+if ! echo "$branch" | grep -qE "$pattern"; then
+  echo ""
+  echo "  [REJECTED] Branch name does not follow the convention."
+  echo ""
+  echo "  Required format : type/number/title"
+  echo "  Examples        : feature/01/flightSearch"
+  echo "                    fix/42/otpTimerReset"
+  echo "                    refactor/07/bookingRepository"
+  echo "                    chore/03/updateDependencies"
+  echo ""
+  echo "  Your branch is  : $branch"
+  echo "  Rename it with  : git branch -m $branch <new-name>"
+  echo ""
+  exit 1
+fi
+
+exit 0

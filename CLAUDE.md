@@ -134,6 +134,7 @@ Then implement.
 ```bash
 git clone <repo-url>
 cd GenFly
+sh .githooks/setup.sh        # enforce branch + commit conventions
 flutter pub get
 # Add google-services.json to android/app/ (get from Firebase Console)
 flutter run
@@ -179,12 +180,28 @@ flutter build apk --release --obfuscate --split-debug-info=build/debug-info
 ---
 
 ## Git Conventions
+
+### Branch Names
 ```
-feat: add flight search screen
-fix: resolve OTP timer reset bug
-refactor: extract booking repository
-chore: update dependencies
+feature/01/flightSearch
+fix/42/otpTimerReset
+refactor/07/bookingRepository
+chore/03/updateDependencies
+docs/05/onboardingGuide
 ```
+Format: `type/number/camelCaseTitle`
+Allowed types: `feature`, `fix`, `refactor`, `chore`, `docs`, `test`
+
+### Commit Messages
+```
+#feature : add flight search screen
+#fix : resolve OTP timer reset bug
+#refactor : extract booking repository
+#chore : update dependencies
+```
+Format: `#type : short description`
+
+Both are enforced by Git hooks — run `sh .githooks/setup.sh` once after cloning.
 
 ---
 
