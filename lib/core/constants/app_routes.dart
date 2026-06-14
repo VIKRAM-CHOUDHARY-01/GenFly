@@ -7,6 +7,9 @@ class AppRoutes {
   static const String register = '/register';
   static const String otpVerification = '/otp-verification';
   static const String home = '/home';
+  static const String bookings = '/bookings';
+  static const String offers = '/offers';
+  static const String support = '/support';
   static const String searchResults = '/search-results';
   static const String flightDetails = '/flight-details';
   static const String seatSelection = '/seat-selection';
