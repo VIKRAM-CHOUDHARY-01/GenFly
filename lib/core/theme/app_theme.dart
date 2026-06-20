@@ -3,17 +3,22 @@ import 'package:flutter/material.dart';
 class AppTheme {
   AppTheme._();
 
-  static const Color primary = Color(0xFF00A651);
-  static const Color primaryDark = Color(0xFF007A3D);
-  static const Color secondary = Color(0xFFFFD100);
+  // Palette derived from the GenFly brand icon gradient:
+  // deep forest (dark corner) → vivid emerald (centre) → lime-yellow (swoosh/plane)
+  static const Color primary = Color(0xFF00C853);
+  static const Color primaryDark = Color(0xFF0D3B2E);
+  static const Color secondary = Color(0xFFBFEF45);
   static const Color skyBlue = Color(0xFF87CEEB);
-  static const Color background = Color(0xFFF8FFFB);
+  static const Color background = Color(0xFFF0FFF4);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color error = Color(0xFFDC3545);
-  static const Color success = Color(0xFF00A651);
-  static const Color textPrimary = Color(0xFF1A2E1F);
-  static const Color textSecondary = Color(0xFF6C757D);
-  static const Color divider = Color(0xFFE8F5ED);
+  static const Color success = Color(0xFF00C853);
+  static const Color textPrimary = Color(0xFF0D2B1A);
+  static const Color textSecondary = Color(0xFF526B5E);
+  static const Color divider = Color(0xFFDCFCE7);
+
+  // Centralised gradient used across the app (mirrors the icon's dark-to-vivid sweep)
+  static const List<Color> brandGradient = [primaryDark, primary];
 
   static ThemeData get lightTheme {
     return ThemeData(

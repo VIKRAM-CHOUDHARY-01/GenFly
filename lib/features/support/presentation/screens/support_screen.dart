@@ -40,7 +40,7 @@ class SupportScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppTheme.primary, Color(0xFF007A3D)]),
+              gradient: const LinearGradient(colors: AppTheme.brandGradient),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../constants/app_routes.dart';
+import '../theme/app_theme.dart';
 import '../widgets/main_scaffold.dart';
 import '../../features/home/presentation/screens/home_screen.dart';
 import '../../features/booking/presentation/screens/bookings_screen.dart';
@@ -62,7 +63,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF00A651),
+      backgroundColor: AppTheme.primary,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
