@@ -146,14 +146,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       ),
       // App logo: clipped to a rounded square so background square disappears
-      title: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Image.asset(
-          'assets/images/app_logo.png',
-          height: 36,
-          width: 36,
-          fit: BoxFit.cover,
-        ),
+      title: Image.asset(
+        'assets/images/New_logo.png',
+        height: 38,
+        fit: BoxFit.contain,
       ),
       centerTitle: false,
       actions: [

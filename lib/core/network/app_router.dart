@@ -129,10 +129,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     opacity: _logoFade,
                     child: SlideTransition(
                       position: _logoSlide,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(22),
-                        child: Image.asset('assets/images/app_logo.png', width: 96, height: 96),
-                      ),
+                      child: Image.asset('assets/images/New_logo.png', height: 90, fit: BoxFit.contain),
                     ),
                   ),
                   const SizedBox(height: 18),
