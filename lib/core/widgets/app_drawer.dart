@@ -32,7 +32,7 @@ class AppDrawer extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF007A3D), Color(0xFF00A651)],
+                colors: AppTheme.brandGradient,
               ),
             ),
             margin: EdgeInsets.zero,

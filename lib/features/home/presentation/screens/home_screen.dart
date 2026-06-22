@@ -123,7 +123,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF007A3D), Color(0xFF00A651), Color(0xFF00C261)],
+              colors: AppTheme.brandGradient,
             ),
           ),
           child: SafeArea(
