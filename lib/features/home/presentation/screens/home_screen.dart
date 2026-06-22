@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/widgets/app_drawer.dart';
 import '../../../../../core/widgets/animated_section.dart';
@@ -14,12 +16,46 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   String _from = 'Delhi';
+  String _fromCode = 'DEL';
   String _to = 'Mumbai';
+  String _toCode = 'BOM';
   String _date = '25 Jun 2026';
   String _travellers = '1 Adult, Economy';
   bool _isRoundTrip = false;
+
   late AnimationController _swapController;
   late Animation<double> _swapRotation;
+
+  final PageController _sliderController = PageController();
+  int _currentSlide = 0;
+  Timer? _sliderTimer;
+
+  static const _slides = [
+    _SlideData(
+      icon: Icons.flight_takeoff_rounded,
+      title: 'Book Flights Instantly',
+      subtitle: 'Compare fares across all airlines\nand fly smarter every time.',
+      gradient: [Color(0xFF0D3B2E), Color(0xFF00C853)],
+    ),
+    _SlideData(
+      icon: Icons.track_changes_rounded,
+      title: 'Real-Time Flight Tracking',
+      subtitle: 'Know exactly where your\nflight is — live on your screen.',
+      gradient: [Color(0xFF1565C0), Color(0xFF42A5F5)],
+    ),
+    _SlideData(
+      icon: Icons.card_giftcard_rounded,
+      title: 'Earn Rewards Every Trip',
+      subtitle: 'Collect points on every booking\nand redeem for free flights.',
+      gradient: [Color(0xFF4A148C), Color(0xFFAB47BC)],
+    ),
+    _SlideData(
+      icon: Icons.support_agent_rounded,
+      title: '24/7 Support Always Ready',
+      subtitle: 'Chat, call or email.\nWe\'re here whenever you need us.',
+      gradient: [Color(0xFF004D40), Color(0xFF26A69A)],
+    ),
+  ];
 
   @override
   void initState() {
@@ -28,21 +64,45 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _swapRotation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _swapController, curve: Curves.easeInOutBack),
     );
+    _sliderTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted) return;
+      final next = (_currentSlide + 1) % _slides.length;
+      _sliderController.animateToPage(
+        next,
+        duration: const Duration(milliseconds: 600),
+        curve: Curves.easeInOutCubic,
+      );
+    });
   }
 
   @override
   void dispose() {
     _swapController.dispose();
+    _sliderController.dispose();
+    _sliderTimer?.cancel();
     super.dispose();
   }
 
   void _swapCities() {
     _swapController.forward(from: 0);
     setState(() {
-      final temp = _from;
+      final tempCity = _from;
       _from = _to;
-      _to = temp;
+      _to = tempCity;
+      final tempCode = _fromCode;
+      _fromCode = _toCode;
+      _toCode = tempCode;
     });
+  }
+
+  Future<void> _openWhatsApp() async {
+    // Replace 919876543210 with your actual WhatsApp support number
+    const phone = '919876543210';
+    const message = 'Hi GenFly! I need help with my booking.';
+    final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
   }
 
   @override
@@ -50,108 +110,91 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Scaffold(
       backgroundColor: AppTheme.background,
       drawer: const AppDrawer(),
+      floatingActionButton: _buildWhatsAppFab(),
       body: CustomScrollView(
+        physics: const BouncingScrollPhysics(),
         slivers: [
-          _buildSliverAppBar(),
+          _buildAppBar(),
+          SliverToBoxAdapter(child: _buildSlider()),
           SliverToBoxAdapter(
             child: AnimatedSection(
-              delay: const Duration(milliseconds: 80),
+              delay: const Duration(milliseconds: 100),
               child: _buildSearchCard(),
             ),
           ),
-          SliverToBoxAdapter(
-            child: AnimatedSection(
-              delay: const Duration(milliseconds: 220),
-              child: _buildOffersSection(),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: AnimatedSection(
-              delay: const Duration(milliseconds: 360),
-              child: _buildPopularRoutes(),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+          const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
     );
   }
 
-  SliverAppBar _buildSliverAppBar() {
+  SliverAppBar _buildAppBar() {
     return SliverAppBar(
-      expandedHeight: 220,
       pinned: true,
-      backgroundColor: AppTheme.primary,
+      backgroundColor: AppTheme.primaryDark,
+      elevation: 0,
       leading: Builder(
         builder: (ctx) => IconButton(
           icon: const Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => Scaffold.of(ctx).openDrawer(),
         ),
       ),
-      title: Row(
-        children: [
-          const Icon(Icons.flight_takeoff_rounded, color: Colors.white, size: 20),
-          const SizedBox(width: 6),
-          const Text(
-            'GenFly',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
+      title: Image.asset(
+        'assets/images/app_logo.png',
+        height: 36,
+        fit: BoxFit.contain,
       ),
+      centerTitle: false,
       actions: [
         IconButton(
           icon: const Icon(Icons.notifications_outlined, color: Colors.white),
           onPressed: () => context.push(AppRoutes.notifications),
         ),
-        const Padding(
-          padding: EdgeInsets.only(right: 12),
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
           child: CircleAvatar(
             radius: 16,
             backgroundColor: AppTheme.secondary,
-            child: Text('V', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
+            child: const Text('V', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
           ),
         ),
       ],
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: AppTheme.brandGradient,
-            ),
+    );
+  }
+
+  Widget _buildSlider() {
+    return SizedBox(
+      height: 220,
+      child: Stack(
+        children: [
+          PageView.builder(
+            controller: _sliderController,
+            onPageChanged: (i) => setState(() => _currentSlide = i),
+            itemCount: _slides.length,
+            itemBuilder: (_, i) => _SlideCard(data: _slides[i]),
           ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 64, 20, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const Text(
-                    'Book Flights\nWithout Hidden\nCharges',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      height: 1.2,
-                    ),
+          Positioned(
+            bottom: 14,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                _slides.length,
+                (i) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  width: _currentSlide == i ? 22 : 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: _currentSlide == i ? Colors.white : Colors.white38,
+                    borderRadius: BorderRadius.circular(3),
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Save up to ₹1000 on every booking.',
-                    style: TextStyle(color: Colors.white70, fontSize: 13),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -160,217 +203,365 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       child: Transform.translate(
-        offset: const Offset(0, -24),
-        child: Card(
-          elevation: 8,
-          shadowColor: Colors.black26,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // One-way / Round trip toggle
-                Row(
+        offset: const Offset(0, -20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Trip type toggle header with gradient
+              Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: AppTheme.brandGradient),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                child: Row(
                   children: [
-                    _TripTypeChip(
+                    _TripChip(
                       label: 'One Way',
                       selected: !_isRoundTrip,
                       onTap: () => setState(() => _isRoundTrip = false),
                     ),
-                    const SizedBox(width: 8),
-                    _TripTypeChip(
+                    const SizedBox(width: 10),
+                    _TripChip(
                       label: 'Round Trip',
                       selected: _isRoundTrip,
                       onTap: () => setState(() => _isRoundTrip = true),
                     ),
+                    const Spacer(),
+                    const Icon(Icons.tune_rounded, color: Colors.white70, size: 20),
                   ],
                 ),
-                const SizedBox(height: 16),
+              ),
 
-                // From / To fields with swap
-                Row(
+              Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
                   children: [
-                    Expanded(
-                      child: _SearchField(
-                        label: 'FROM',
-                        value: _from,
-                        icon: Icons.flight_takeoff_rounded,
-                        onTap: () {},
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: _swapCities,
-                      child: RotationTransition(
-                        turns: _swapRotation,
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 8),
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.1),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
+                    // Large airport code row
+                    _buildCityRow(),
+                    const SizedBox(height: 16),
+                    // Dotted flight path divider
+                    _FlightPathDivider(isRoundTrip: _isRoundTrip),
+                    const SizedBox(height: 16),
+                    // Date row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _InfoTile(
+                            icon: Icons.calendar_today_rounded,
+                            label: 'DEPARTURE',
+                            value: _date,
                           ),
-                          child: const Icon(Icons.swap_horiz_rounded, color: AppTheme.primary, size: 20),
                         ),
-                      ),
+                        if (_isRoundTrip) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _InfoTile(
+                              icon: Icons.event_available_rounded,
+                              label: 'RETURN',
+                              value: 'Select date',
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
-                    Expanded(
-                      child: _SearchField(
-                        label: 'TO',
-                        value: _to,
-                        icon: Icons.flight_land_rounded,
-                        onTap: () {},
+                    const SizedBox(height: 12),
+                    // Travellers
+                    _InfoTile(
+                      icon: Icons.people_outline_rounded,
+                      label: 'TRAVELLERS & CLASS',
+                      value: _travellers,
+                      trailing: const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppTheme.textSecondary),
+                    ),
+                    const SizedBox(height: 18),
+                    // Search button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 54,
+                      child: ElevatedButton(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppTheme.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          elevation: 4,
+                          shadowColor: AppTheme.primary.withValues(alpha: 0.4),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.search_rounded, size: 22),
+                            SizedBox(width: 8),
+                            Text(
+                              'Search Flights',
+                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-
-                // Date and Travellers
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SearchField(
-                        label: 'DEPARTURE',
-                        value: _date,
-                        icon: Icons.calendar_today_rounded,
-                        onTap: () {},
-                      ),
-                    ),
-                    if (_isRoundTrip) ...[
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _SearchField(
-                          label: 'RETURN',
-                          value: 'Select',
-                          icon: Icons.calendar_today_outlined,
-                          onTap: () {},
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                _SearchField(
-                  label: 'TRAVELLERS & CLASS',
-                  value: _travellers,
-                  icon: Icons.people_outline_rounded,
-                  onTap: () {},
-                  trailing: const Icon(Icons.keyboard_arrow_down_rounded, color: AppTheme.textSecondary),
-                ),
-                const SizedBox(height: 16),
-
-                // Search button
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: ElevatedButton.icon(
-                    onPressed: () {},
-                    icon: const Icon(Icons.search_rounded),
-                    label: const Text('Search Flights'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _buildOffersSection() {
-    final offers = [
-      _OfferData('GENFLY10', '10% Off', 'Use on your first booking', AppTheme.secondary),
-      _OfferData('SUMMER25', '₹250 Off', 'On flights above ₹3000', AppTheme.skyBlue),
-      _OfferData('WEEKEND', 'Flat ₹500', 'Weekend getaway special', const Color(0xFFFFB347)),
-    ];
-    return Padding(
-      padding: const EdgeInsets.only(top: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  Widget _buildCityRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // FROM
+        Expanded(
+          child: GestureDetector(
+            onTap: () {},
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Exclusive Offers', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                TextButton(
-                  onPressed: () {},
-                  child: const Text('View All', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                const Text(
+                  'FROM',
+                  style: TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 1),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _fromCode,
+                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.textPrimary, height: 1),
+                ),
+                Text(
+                  _from,
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
           ),
-          SizedBox(
-            height: 110,
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              scrollDirection: Axis.horizontal,
-              itemCount: offers.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (_, i) => _OfferCard(data: offers[i]),
+        ),
+
+        // Swap button
+        GestureDetector(
+          onTap: _swapCities,
+          child: RotationTransition(
+            turns: _swapRotation,
+            child: Container(
+              padding: const EdgeInsets.all(11),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: AppTheme.brandGradient),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.primary.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 22),
             ),
+          ),
+        ),
+
+        // TO
+        Expanded(
+          child: GestureDetector(
+            onTap: () {},
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                const Text(
+                  'TO',
+                  style: TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 1),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _toCode,
+                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primary, height: 1),
+                ),
+                Text(
+                  _to,
+                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWhatsAppFab() {
+    return GestureDetector(
+      onTap: _openWhatsApp,
+      child: Container(
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          color: const Color(0xFF25D366),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF25D366).withValues(alpha: 0.45),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: const Icon(Icons.chat_rounded, color: Colors.white, size: 28),
+      ),
+    );
+  }
+}
+
+// --- Slider ---
+
+class _SlideData {
+  final IconData icon;
+  final String title, subtitle;
+  final List<Color> gradient;
+  const _SlideData({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.gradient,
+  });
+}
+
+class _SlideCard extends StatelessWidget {
+  final _SlideData data;
+  const _SlideCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: data.gradient,
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(28, 28, 28, 36),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  data.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    height: 1.25,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  data.subtitle,
+                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.55),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 20),
+          Container(
+            width: 82,
+            height: 82,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(data.icon, color: Colors.white, size: 42),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildPopularRoutes() {
-    final routes = [
-      _RouteData('DEL', 'BOM', 'Delhi → Mumbai', '₹3,499', 'Non-stop · 2h 15m'),
-      _RouteData('BOM', 'BLR', 'Mumbai → Bengaluru', '₹2,899', 'Non-stop · 1h 45m'),
-      _RouteData('DEL', 'GOI', 'Delhi → Goa', '₹4,199', '1 Stop · 3h 30m'),
-      _RouteData('HYD', 'DEL', 'Hyderabad → Delhi', '₹3,799', 'Non-stop · 2h 5m'),
-    ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Popular Routes', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-          const SizedBox(height: 12),
-          ...routes.map((r) => _RouteCard(data: r)),
-        ],
-      ),
+// --- Flight path visual divider ---
+
+class _FlightPathDivider extends StatelessWidget {
+  final bool isRoundTrip;
+  const _FlightPathDivider({required this.isRoundTrip});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1.5,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppTheme.divider, AppTheme.primary.withValues(alpha: 0.4)],
+              ),
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          child: Icon(
+            isRoundTrip ? Icons.swap_horiz_rounded : Icons.flight_rounded,
+            color: AppTheme.primary,
+            size: 22,
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1.5,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppTheme.primary.withValues(alpha: 0.4), AppTheme.divider],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
 
 // --- Sub-widgets ---
 
-class _TripTypeChip extends StatelessWidget {
+class _TripChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const _TripTypeChip({required this.label, required this.selected, required this.onTap});
+  const _TripChip({required this.label, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? AppTheme.primary : Colors.transparent,
+          color: selected ? Colors.white : Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: selected ? AppTheme.primary : AppTheme.divider),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : AppTheme.textSecondary,
+            fontWeight: FontWeight.w700,
+            color: selected ? AppTheme.primaryDark : Colors.white70,
           ),
         ),
       ),
@@ -378,147 +569,47 @@ class _TripTypeChip extends StatelessWidget {
   }
 }
 
-class _SearchField extends StatelessWidget {
-  final String label;
-  final String value;
+class _InfoTile extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onTap;
+  final String label, value;
   final Widget? trailing;
-
-  const _SearchField({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.onTap,
-    this.trailing,
-  });
+  const _InfoTile({required this.icon, required this.label, required this.value, this.trailing});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {},
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: AppTheme.background,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppTheme.divider),
         ),
         child: Row(
           children: [
             Icon(icon, size: 18, color: AppTheme.primary),
-            const SizedBox(width: 8),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(label, style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                  Text(
+                    label,
+                    style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 0.8),
+                  ),
                   const SizedBox(height: 2),
-                  Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary), overflow: TextOverflow.ellipsis),
+                  Text(
+                    value,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ],
               ),
             ),
             if (trailing != null) trailing!,
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _OfferData {
-  final String code, title, desc;
-  final Color color;
-  const _OfferData(this.code, this.title, this.desc, this.color);
-}
-
-class _OfferCard extends StatelessWidget {
-  final _OfferData data;
-  const _OfferCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 180,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: data.color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: data.color.withValues(alpha: 0.4)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: data.color.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(data.code, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 0.5)),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(data.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-              Text(data.desc, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RouteData {
-  final String from, to, label, price, info;
-  const _RouteData(this.from, this.to, this.label, this.price, this.info);
-}
-
-class _RouteCard extends StatelessWidget {
-  final _RouteData data;
-  const _RouteCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppTheme.divider),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 4, offset: const Offset(0, 2))],
-      ),
-      child: Row(
-        children: [
-          Column(
-            children: [
-              Text(data.from, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primary)),
-              const Icon(Icons.flight_rounded, size: 14, color: AppTheme.textSecondary),
-              Text(data.to, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(data.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-                const SizedBox(height: 2),
-                Text(data.info, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
-              ],
-            ),
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(data.price, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppTheme.primary)),
-              const Text('onwards', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
-            ],
-          ),
-        ],
       ),
     );
   }
