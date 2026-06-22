@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -96,12 +97,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _openWhatsApp() async {
-    // Replace 919876543210 with your actual WhatsApp support number
+    // Replace with your actual WhatsApp support number (country code + number, no +)
     const phone = '919876543210';
     const message = 'Hi GenFly! I need help with my booking.';
     final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
-    if (await canLaunchUrl(uri)) {
+    try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      // Fallback: open wa.me in browser
+      await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
     }
   }
 
@@ -110,12 +114,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Scaffold(
       backgroundColor: AppTheme.background,
       drawer: const AppDrawer(),
-      floatingActionButton: _buildWhatsAppFab(),
+      floatingActionButton: _WhatsAppFab(onTap: _openWhatsApp),
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
           _buildAppBar(),
           SliverToBoxAdapter(child: _buildSlider()),
+          // Clear visual gap — no negative translate pulling the card into the slider
+          const SliverToBoxAdapter(child: SizedBox(height: 20)),
           SliverToBoxAdapter(
             child: AnimatedSection(
               delay: const Duration(milliseconds: 100),
@@ -139,10 +145,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           onPressed: () => Scaffold.of(ctx).openDrawer(),
         ),
       ),
-      title: Image.asset(
-        'assets/images/app_logo.png',
-        height: 36,
-        fit: BoxFit.contain,
+      // App logo: clipped to a rounded square so background square disappears
+      title: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Image.asset(
+          'assets/images/app_logo.png',
+          height: 36,
+          width: 36,
+          fit: BoxFit.cover,
+        ),
       ),
       centerTitle: false,
       actions: [
@@ -201,121 +212,114 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildSearchCard() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-      child: Transform.translate(
-        offset: const Offset(0, -20),
-        child: Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
+      // No negative offset — sits cleanly below the slider gap
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Gradient header with trip type toggle
+            Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(colors: AppTheme.brandGradient),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-            ],
-          ),
-          child: Column(
-            children: [
-              // Trip type toggle header with gradient
-              Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: AppTheme.brandGradient),
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-                child: Row(
-                  children: [
-                    _TripChip(
-                      label: 'One Way',
-                      selected: !_isRoundTrip,
-                      onTap: () => setState(() => _isRoundTrip = false),
-                    ),
-                    const SizedBox(width: 10),
-                    _TripChip(
-                      label: 'Round Trip',
-                      selected: _isRoundTrip,
-                      onTap: () => setState(() => _isRoundTrip = true),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.tune_rounded, color: Colors.white70, size: 20),
-                  ],
-                ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              child: Row(
+                children: [
+                  _TripChip(
+                    label: 'One Way',
+                    selected: !_isRoundTrip,
+                    onTap: () => setState(() => _isRoundTrip = false),
+                  ),
+                  const SizedBox(width: 10),
+                  _TripChip(
+                    label: 'Round Trip',
+                    selected: _isRoundTrip,
+                    onTap: () => setState(() => _isRoundTrip = true),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.tune_rounded, color: Colors.white70, size: 20),
+                ],
               ),
+            ),
 
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    // Large airport code row
-                    _buildCityRow(),
-                    const SizedBox(height: 16),
-                    // Dotted flight path divider
-                    _FlightPathDivider(isRoundTrip: _isRoundTrip),
-                    const SizedBox(height: 16),
-                    // Date row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _InfoTile(
-                            icon: Icons.calendar_today_rounded,
-                            label: 'DEPARTURE',
-                            value: _date,
-                          ),
-                        ),
-                        if (_isRoundTrip) ...[
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _InfoTile(
-                              icon: Icons.event_available_rounded,
-                              label: 'RETURN',
-                              value: 'Select date',
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    // Travellers
-                    _InfoTile(
-                      icon: Icons.people_outline_rounded,
-                      label: 'TRAVELLERS & CLASS',
-                      value: _travellers,
-                      trailing: const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppTheme.textSecondary),
-                    ),
-                    const SizedBox(height: 18),
-                    // Search button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 54,
-                      child: ElevatedButton(
-                        onPressed: () {},
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppTheme.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          elevation: 4,
-                          shadowColor: AppTheme.primary.withValues(alpha: 0.4),
-                        ),
-                        child: const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.search_rounded, size: 22),
-                            SizedBox(width: 8),
-                            Text(
-                              'Search Flights',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 0.3),
-                            ),
-                          ],
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  _buildCityRow(),
+                  const SizedBox(height: 16),
+                  _FlightPathDivider(isRoundTrip: _isRoundTrip),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _InfoTile(
+                          icon: Icons.calendar_today_rounded,
+                          label: 'DEPARTURE',
+                          value: _date,
                         ),
                       ),
+                      if (_isRoundTrip) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _InfoTile(
+                            icon: Icons.event_available_rounded,
+                            label: 'RETURN',
+                            value: 'Select date',
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _InfoTile(
+                    icon: Icons.people_outline_rounded,
+                    label: 'TRAVELLERS & CLASS',
+                    value: _travellers,
+                    trailing: const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 18),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: () {},
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 4,
+                        shadowColor: AppTheme.primary.withValues(alpha: 0.4),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_rounded, size: 22),
+                          SizedBox(width: 8),
+                          Text(
+                            'Search Flights',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 0.3),
+                          ),
+                        ],
+                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -325,32 +329,20 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // FROM
         Expanded(
           child: GestureDetector(
             onTap: () {},
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'FROM',
-                  style: TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 1),
-                ),
+                const Text('FROM', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 1)),
                 const SizedBox(height: 4),
-                Text(
-                  _fromCode,
-                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.textPrimary, height: 1),
-                ),
-                Text(
-                  _from,
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
-                ),
+                Text(_fromCode, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.textPrimary, height: 1)),
+                Text(_from, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
         ),
-
-        // Swap button
         GestureDetector(
           onTap: _swapCities,
           child: RotationTransition(
@@ -361,38 +353,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 gradient: const LinearGradient(colors: AppTheme.brandGradient),
                 shape: BoxShape.circle,
                 boxShadow: [
-                  BoxShadow(
-                    color: AppTheme.primary.withValues(alpha: 0.35),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
+                  BoxShadow(color: AppTheme.primary.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
                 ],
               ),
               child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 22),
             ),
           ),
         ),
-
-        // TO
         Expanded(
           child: GestureDetector(
             onTap: () {},
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                const Text(
-                  'TO',
-                  style: TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 1),
-                ),
+                const Text('TO', style: TextStyle(fontSize: 10, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 1)),
                 const SizedBox(height: 4),
-                Text(
-                  _toCode,
-                  style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primary, height: 1),
-                ),
-                Text(
-                  _to,
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
-                ),
+                Text(_toCode, style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w900, color: AppTheme.primary, height: 1)),
+                Text(_to, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500)),
               ],
             ),
           ),
@@ -400,28 +377,96 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ],
     );
   }
+}
 
-  Widget _buildWhatsAppFab() {
+// --- WhatsApp FAB with proper icon ---
+
+class _WhatsAppFab extends StatelessWidget {
+  final VoidCallback onTap;
+  const _WhatsAppFab({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: _openWhatsApp,
+      onTap: onTap,
       child: Container(
-        width: 56,
-        height: 56,
+        width: 58,
+        height: 58,
         decoration: BoxDecoration(
           color: const Color(0xFF25D366),
           shape: BoxShape.circle,
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF25D366).withValues(alpha: 0.45),
-              blurRadius: 14,
+              color: const Color(0xFF25D366).withValues(alpha: 0.50),
+              blurRadius: 16,
               offset: const Offset(0, 6),
             ),
           ],
         ),
-        child: const Icon(Icons.chat_rounded, color: Colors.white, size: 28),
+        child: CustomPaint(painter: _WhatsAppIconPainter()),
       ),
     );
   }
+}
+
+class _WhatsAppIconPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final r = size.width * 0.36; // speech-bubble radius
+
+    // Draw speech bubble circle
+    canvas.drawCircle(Offset(cx, cy - 1), r, paint);
+
+    // Speech bubble tail (bottom-left)
+    final tail = Path()
+      ..moveTo(cx - r * 0.5, cy + r * 0.7)
+      ..lineTo(cx - r * 1.0, cy + r * 1.1)
+      ..lineTo(cx - r * 0.1, cy + r * 0.75)
+      ..close();
+    canvas.drawPath(tail, paint);
+
+    // Draw phone handset inside the bubble in green
+    final phonePaint = Paint()
+      ..color = const Color(0xFF25D366)
+      ..style = PaintingStyle.fill;
+
+    canvas.save();
+    canvas.translate(cx, cy - 1);
+    // Rotate 40° counter-clockwise to mimic WhatsApp handset angle
+    canvas.rotate(-math.pi / 4.5);
+
+    final s = size.width * 0.11; // scale factor for handset parts
+
+    // Earpiece oval (top)
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(0, -s * 1.8), width: s * 1.7, height: s * 1.2),
+      phonePaint,
+    );
+    // Connecting grip bar
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset.zero, width: s * 1.1, height: s * 2.6),
+        Radius.circular(s * 0.4),
+      ),
+      phonePaint,
+    );
+    // Mouthpiece oval (bottom)
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(0, s * 1.8), width: s * 1.7, height: s * 1.2),
+      phonePaint,
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
 }
 
 // --- Slider ---
@@ -463,12 +508,7 @@ class _SlideCard extends StatelessWidget {
               children: [
                 Text(
                   data.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                    height: 1.25,
-                  ),
+                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.25),
                 ),
                 const SizedBox(height: 10),
                 Text(
@@ -494,7 +534,7 @@ class _SlideCard extends StatelessWidget {
   }
 }
 
-// --- Flight path visual divider ---
+// --- Flight path divider ---
 
 class _FlightPathDivider extends StatelessWidget {
   final bool isRoundTrip;
@@ -594,16 +634,9 @@ class _InfoTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    label,
-                    style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 0.8),
-                  ),
+                  Text(label, style: const TextStyle(fontSize: 9, color: AppTheme.textSecondary, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
                   const SizedBox(height: 2),
-                  Text(
-                    value,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary), overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
