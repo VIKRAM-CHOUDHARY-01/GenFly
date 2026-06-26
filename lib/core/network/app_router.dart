@@ -21,10 +21,6 @@ final GlobalKey<NavigatorState> _rootNavKey =
 // ---------------------------------------------------------------------------
 // Splash screen
 // ---------------------------------------------------------------------------
-//
-// Straight vertical flight: plane rises from below screen to above.
-// Icons.flight_rounded default = NE (45° upper-right).
-// Rotate -pi/4 (45° CCW) → icon points straight up (North). No guessing.
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -38,38 +34,48 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _main;
   late final AnimationController _dots;
 
-  late final Animation<double> _contentFade;
   late final Animation<double> _logoScale;
-  late final Animation<double> _planeProg;
+  late final Animation<double> _logoFade;
+  late final Animation<double> _textFade;
+  late final Animation<Offset> _textSlide;
+  late final Animation<double> _tagFade;
 
   @override
   void initState() {
     super.initState();
 
     _main = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 2000));
+        vsync: this, duration: const Duration(milliseconds: 2800));
     _dots = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 700))
       ..repeat();
 
-    // Everything fades in together on the very first frame
-    _contentFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+    _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
             parent: _main,
-            curve: const Interval(0.0, 0.20, curve: Curves.easeOut)));
-
-    _logoScale = Tween<double>(begin: 0.7, end: 1.0).animate(
+            curve: const Interval(0.0, 0.48, curve: Curves.elasticOut)));
+    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
             parent: _main,
-            curve: const Interval(0.0, 0.35, curve: Curves.easeOutBack)));
+            curve: const Interval(0.0, 0.16, curve: Curves.easeOut)));
 
-    // Plane flies bottom→top over full animation window
-    _planeProg = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _main, curve: const Interval(0.0, 1.0)));
+    _textFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+            parent: _main,
+            curve: const Interval(0.26, 0.46, curve: Curves.easeOut)));
+    _textSlide =
+        Tween<Offset>(begin: const Offset(0.35, 0), end: Offset.zero).animate(
+            CurvedAnimation(
+                parent: _main,
+                curve: const Interval(0.26, 0.48, curve: Curves.easeOutCubic)));
+
+    _tagFade = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
+        parent: _main,
+        curve: const Interval(0.42, 0.60, curve: Curves.easeOut)));
 
     _main.forward();
 
-    Future.delayed(const Duration(milliseconds: 2400), () {
+    Future.delayed(const Duration(milliseconds: 3300), () {
       if (mounted) context.go(AppRoutes.home);
     });
   }
@@ -84,77 +90,58 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    const iconHalf = 22.0;
 
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        // Solid #0D3B2E matches the native Android splash exactly —
-        // no visible colour jump when Flutter takes over.
-        color: const Color(0xFF0D3B2E),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF071E12), Color(0xFF0D3B2E), Color(0xFF0A2E20)],
+          ),
+        ),
         child: Stack(
           children: [
-            // Airplane: straight up, nose pointing north
-            AnimatedBuilder(
-              animation: _planeProg,
-              builder: (_, __) {
-                final p = _planeProg.value;
-                // Enter from 10% below screen, exit 10% above screen
-                final y = size.height * (1.10 - p * 1.25) - iconHalf;
-                final x = size.width / 2 - iconHalf;
-                // Fade in first 10%, fade out last 20%
-                final opacity = p < 0.10
-                    ? p / 0.10
-                    : p > 0.80
-                        ? (1.0 - p) / 0.20
-                        : 1.0;
-                return Positioned(
-                  left: x,
-                  top: y,
-                  child: Opacity(
-                    opacity: opacity.clamp(0.0, 1.0),
-                    child: Transform.rotate(
-                      // NE default icon → rotate -pi/4 → points straight up
-                      angle: -math.pi / 4,
-                      child: Icon(
-                        Icons.flight_rounded,
-                        color: Colors.white.withValues(alpha: 0.90),
-                        size: 44,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
+            ..._buildClouds(size),
 
-            // Logo + brand + tagline — all fade in together immediately
-            FadeTransition(
-              opacity: _contentFade,
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ScaleTransition(
-                      scale: _logoScale,
+            // Logo + brand + tagline — staggered entrance
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ScaleTransition(
+                    scale: _logoScale,
+                    child: FadeTransition(
+                      opacity: _logoFade,
                       child: Image.asset(
                         'assets/images/New_logo.png',
                         height: 110,
                         fit: BoxFit.contain,
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'GenFly',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 3.0,
+                  ),
+                  const SizedBox(height: 20),
+                  FadeTransition(
+                    opacity: _textFade,
+                    child: SlideTransition(
+                      position: _textSlide,
+                      child: const Text(
+                        'GenFly',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 48,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 3.0,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    const Text(
+                  ),
+                  const SizedBox(height: 10),
+                  FadeTransition(
+                    opacity: _tagFade,
+                    child: const Text(
                       'Fly Smart. Fly Easy.',
                       style: TextStyle(
                         color: Colors.white54,
@@ -163,8 +150,8 @@ class _SplashScreenState extends State<SplashScreen>
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
 
@@ -198,6 +185,26 @@ class _SplashScreenState extends State<SplashScreen>
         ),
       ),
     );
+  }
+
+  List<Widget> _buildClouds(Size size) {
+    const specs = [
+      (0.06, 0.10, 80.0, 0.04),
+      (0.70, 0.07, 95.0, 0.035),
+      (0.80, 0.30, 60.0, 0.05),
+      (0.10, 0.45, 70.0, 0.03),
+      (0.50, 0.65, 55.0, 0.04),
+      (0.30, 0.80, 75.0, 0.03),
+    ];
+    return specs.map((s) {
+      final (dx, dy, sz, alpha) = s;
+      return Positioned(
+        left: dx * size.width,
+        top: dy * size.height,
+        child: Icon(Icons.cloud_rounded,
+            size: sz, color: Colors.white.withValues(alpha: alpha)),
+      );
+    }).toList();
   }
 }
 
