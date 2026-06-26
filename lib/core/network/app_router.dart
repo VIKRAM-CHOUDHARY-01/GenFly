@@ -39,8 +39,8 @@ double _planeY(double t, double h) {
 // where the plane is actually going. Icons.flight_rounded default = NE (45°),
 // so Flutter rotation r = π/4 − θ where θ is velocity direction from east.
 double _planeAngle(double t, double w, double h) {
-  const δ = 0.008;
-  final t1 = (t + δ).clamp(0.0, 0.994);
+  const dt = 0.008;
+  final t1 = (t + dt).clamp(0.0, 0.994);
   final dx = _planeX(t1, w) - _planeX(t, w);
   final dy = _planeY(t1, h) - _planeY(t, h);
   if (dx.abs() < 0.1) return math.pi / 4;
