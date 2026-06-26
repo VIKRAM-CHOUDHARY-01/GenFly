@@ -11,6 +11,42 @@ import '../../features/support/presentation/screens/support_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
 import '../../features/search/presentation/screens/search_results_screen.dart';
+import '../../features/search/presentation/screens/flight_comparison_screen.dart';
+
+// ---------------------------------------------------------------------------
+// Plane physics helpers — used by both the icon widget and the contrail painter
+// ---------------------------------------------------------------------------
+
+// Phase 0–0.44: runway roll — plane accelerates horizontally (easeIn)
+// Phase 0.44–1.0: airborne — constant horizontal speed
+// Ground level: 73% from top of screen
+double _planeX(double t, double w) {
+  if (t < 0.44) {
+    return (-0.50 + Curves.easeIn.transform(t / 0.44) * 0.95) * w;
+  }
+  return (0.45 + ((t - 0.44) / 0.56) * 1.30) * w;
+}
+
+double _planeY(double t, double h) {
+  const groundFrac = 0.73;
+  if (t < 0.52) return groundFrac * h;
+  // easeOut: fast initial climb (steep nose-up), then levels off
+  final ct = (t - 0.52) / 0.48;
+  return (groundFrac - Curves.easeOut.transform(ct) * 0.62) * h;
+}
+
+// Angle is computed from instantaneous velocity so the nose ALWAYS points
+// where the plane is actually going. Icons.flight_rounded default = NE (45°),
+// so Flutter rotation r = π/4 − θ where θ is velocity direction from east.
+double _planeAngle(double t, double w, double h) {
+  const δ = 0.008;
+  final t1 = (t + δ).clamp(0.0, 0.994);
+  final dx = _planeX(t1, w) - _planeX(t, w);
+  final dy = _planeY(t1, h) - _planeY(t, h);
+  if (dx.abs() < 0.1) return math.pi / 4;
+  // atan2(-dy, dx): screen y is inverted so negate dy to get standard math angle
+  return math.pi / 4 - math.atan2(-dy, dx);
+}
 
 // ---------------------------------------------------------------------------
 // Splash screen — single seamless screen, matches native splash green exactly
@@ -67,11 +103,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     _tagFade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _main, curve: const Interval(0.46, 0.65, curve: Curves.easeOut)));
 
-    // Plane sweeps from bottom-left to top-right
+    // Plane drives takeoff physics: linear t, all easing is inside _planeX/_planeY/_planeAngle
     _planeProg = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _main, curve: const Interval(0.12, 0.88, curve: Curves.easeInOut)));
+      CurvedAnimation(parent: _main, curve: const Interval(0.10, 0.90)));
     _planeFade = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _main, curve: const Interval(0.80, 0.92, curve: Curves.easeIn)));
+      CurvedAnimation(parent: _main, curve: const Interval(0.82, 0.94, curve: Curves.easeIn)));
 
     _main.forward();
 
@@ -108,16 +144,14 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
             // Faint background clouds for depth
             ..._buildClouds(size),
 
-            // Animated airplane sweeping across
+            // Animated airplane — runs physics-correct takeoff
             AnimatedBuilder(
               animation: _main,
               builder: (_, __) {
                 final t = _planeProg.value;
-                // Arc path: bottom-left → top-right with a slight upward bow
-                final x = (-0.55 + t * 2.2) * size.width;
-                final y = (0.72 - t * 0.60 - 0.18 * math.sin(t * math.pi)) * size.height;
-                // Tilt: shallow climb angle matching arc derivative
-                final angle = -math.pi / 10 + (t * math.pi / 22);
+                final x = _planeX(t, size.width);
+                final y = _planeY(t, size.height);
+                final angle = _planeAngle(t, size.width, size.height);
                 return Positioned(
                   left: x,
                   top: y,
@@ -127,8 +161,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                       angle: angle,
                       child: Icon(
                         Icons.flight_rounded,
-                        color: Colors.white.withValues(alpha: 0.9),
-                        size: 42,
+                        color: Colors.white.withValues(alpha: 0.92),
+                        size: 44,
                       ),
                     ),
                   ),
@@ -254,24 +288,24 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   }
 }
 
-// Draws the plane's fading contrail along the arc path
+// Draws the plane's fading contrail — uses the same physics as the plane icon
 class _ContrailPainter extends CustomPainter {
   final double progress;
   const _ContrailPainter({required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (progress < 0.05) return;
+    if (progress < 0.04) return;
 
-    // Draw ~12 fading dots behind the current plane position
-    const trailCount = 12;
+    const trailCount = 14;
+    const iconHalf = 22.0; // half of icon size (44px) to centre the dot on the icon
     for (int i = 1; i <= trailCount; i++) {
-      final t = (progress - i * 0.028).clamp(0.0, 1.0);
+      final t = (progress - i * 0.025).clamp(0.0, 1.0);
       if (t <= 0) break;
-      final x = (-0.55 + t * 2.2) * size.width + 21; // +21 centres on icon
-      final y = (0.72 - t * 0.60 - 0.18 * math.sin(t * math.pi)) * size.height + 21;
-      final alpha = (1 - i / trailCount) * 0.22 * progress;
-      final radius = (1 - i / trailCount) * 3.5;
+      final x = _planeX(t, size.width) + iconHalf;
+      final y = _planeY(t, size.height) + iconHalf;
+      final alpha = (1 - i / trailCount) * 0.20 * progress;
+      final radius = (1 - i / trailCount) * 3.0;
       canvas.drawCircle(
         Offset(x, y),
         radius,
@@ -352,6 +386,29 @@ final GoRouter appRouter = GoRouter(
             toCode: e['toCode'] ?? 'BOM',
             date: e['date'] ?? '',
             travellers: e['travellers'] ?? '1 Adult, Economy',
+          ),
+          state: state,
+        );
+      },
+    ),
+    GoRoute(
+      path: AppRoutes.flightComparison,
+      pageBuilder: (context, state) {
+        final e = (state.extra as Map<String, String>?) ?? {};
+        return _slideRightPage(
+          child: FlightComparisonScreen(
+            airline: e['airline'] ?? '',
+            initial: e['initial'] ?? '',
+            flightNo: e['flightNo'] ?? '',
+            dep: e['dep'] ?? '',
+            arr: e['arr'] ?? '',
+            depCode: e['depCode'] ?? 'DEL',
+            arrCode: e['arrCode'] ?? 'BOM',
+            duration: e['duration'] ?? '',
+            stops: e['stops'] ?? '',
+            genFlyPrice: e['genFlyPrice'] ?? '',
+            date: e['date'] ?? '',
+            travellers: e['travellers'] ?? '',
           ),
           state: state,
         );

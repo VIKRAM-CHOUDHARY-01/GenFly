@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/constants/app_routes.dart';
 
 class SearchResultsScreen extends StatefulWidget {
   final String from, fromCode, to, toCode, date, travellers;
@@ -20,7 +22,7 @@ class SearchResultsScreen extends StatefulWidget {
 }
 
 class _SearchResultsScreenState extends State<SearchResultsScreen> {
-  int _selected = 1; // IndiGo selected by default (best value)
+  int _selected = 1; // IndiGo selected by default
 
   static const _flights = [
     _FlightData(
@@ -32,8 +34,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       depCode: 'DEL', arrCode: 'BOM',
       duration: '2h 15m',
       stops: 'Non-stop',
-      price: '₹4,200',
-      saving: 'Save ₹600',
+      genFlyPrice: '₹4,200',
       isBestValue: false,
     ),
     _FlightData(
@@ -45,8 +46,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       depCode: 'DEL', arrCode: 'BOM',
       duration: '2h 10m',
       stops: 'Non-stop',
-      price: '₹3,900',
-      saving: 'Save ₹600',
+      genFlyPrice: '₹3,900',
       isBestValue: true,
     ),
     _FlightData(
@@ -58,8 +58,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       depCode: 'DEL', arrCode: 'BOM',
       duration: '2h 15m',
       stops: 'Non-stop',
-      price: '₹4,050',
-      saving: 'Save ₹550',
+      genFlyPrice: '₹4,050',
       isBestValue: false,
     ),
     _FlightData(
@@ -71,21 +70,38 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       depCode: 'DEL', arrCode: 'BOM',
       duration: '2h 20m',
       stops: 'Non-stop',
-      price: '₹4,450',
-      saving: 'Save ₹450',
+      genFlyPrice: '₹4,450',
       isBestValue: false,
     ),
   ];
 
+  void _goToComparison() {
+    final f = _flights[_selected];
+    context.push(AppRoutes.flightComparison, extra: {
+      'airline': f.airline,
+      'initial': f.initial,
+      'flightNo': f.flightNo,
+      'dep': f.dep,
+      'arr': f.arr,
+      'depCode': f.depCode,
+      'arrCode': f.arrCode,
+      'duration': f.duration,
+      'stops': f.stops,
+      'genFlyPrice': f.genFlyPrice,
+      'date': widget.date,
+      'travellers': widget.travellers,
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final selected = _flights[_selected];
+    final f = _flights[_selected];
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6F8),
       appBar: _buildAppBar(context),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 32),
+        padding: const EdgeInsets.only(bottom: 110),
         children: [
           _buildStepBar(),
           _buildSectionHeader(),
@@ -94,8 +110,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             isSelected: _selected == i,
             onTap: () => setState(() => _selected = i),
           )),
-          const SizedBox(height: 12),
-          _buildLiveComparison(selected),
           const SizedBox(height: 20),
           _buildTrustBadges(),
           const SizedBox(height: 20),
@@ -103,6 +117,7 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
           const SizedBox(height: 20),
         ],
       ),
+      bottomNavigationBar: _buildBottomBar(f),
     );
   }
 
@@ -138,62 +153,45 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
 
   Widget _buildStepBar() {
     const steps = ['Route', 'Date', 'Airline', 'Compare', 'Book'];
-    const current = 2; // Airline step
+    const current = 2;
     return Container(
       color: AppTheme.primaryDark,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       child: Row(
         children: List.generate(steps.length * 2 - 1, (i) {
           if (i.isOdd) {
-            // Connector line
-            final stepIdx = i ~/ 2;
             return Expanded(
               child: Container(
                 height: 2,
-                color: stepIdx < current ? AppTheme.secondary : Colors.white24,
+                color: (i ~/ 2) < current ? AppTheme.secondary : Colors.white24,
               ),
             );
           }
-          final stepIdx = i ~/ 2;
-          final isDone = stepIdx < current;
-          final isActive = stepIdx == current;
+          final idx = i ~/ 2;
+          final isDone = idx < current;
+          final isActive = idx == current;
           return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 250),
-                width: 28,
-                height: 28,
+                width: 28, height: 28,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: isDone ? AppTheme.secondary : isActive ? Colors.white : Colors.transparent,
-                  border: Border.all(
-                    color: isDone || isActive ? Colors.transparent : Colors.white38,
-                    width: 1.5,
-                  ),
+                  border: Border.all(color: isDone || isActive ? Colors.transparent : Colors.white38, width: 1.5),
                 ),
                 child: Center(
                   child: isDone
                       ? const Icon(Icons.check_rounded, size: 16, color: AppTheme.primaryDark)
-                      : Text(
-                          '${stepIdx + 1}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: isActive ? AppTheme.primaryDark : Colors.white38,
-                          ),
-                        ),
+                      : Text('${idx + 1}', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                          color: isActive ? AppTheme.primaryDark : Colors.white38)),
                 ),
               ),
               const SizedBox(height: 4),
-              Text(
-                steps[stepIdx],
-                style: TextStyle(
-                  fontSize: 9,
+              Text(steps[idx], style: TextStyle(fontSize: 9,
                   fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
-                  color: isDone ? AppTheme.secondary : isActive ? Colors.white : Colors.white38,
-                ),
-              ),
+                  color: isDone ? AppTheme.secondary : isActive ? Colors.white : Colors.white38)),
             ],
           );
         }),
@@ -207,127 +205,11 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Select Your Flight',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimary),
-          ),
+          const Text('Available Flights', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
           const SizedBox(height: 4),
-          Text(
-            '${widget.from} (${widget.fromCode}) → ${widget.to} (${widget.toCode})  •  ${widget.date}',
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-          ),
+          Text('${widget.from} → ${widget.to}  •  ${widget.date}  •  ${widget.travellers}',
+              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
         ],
-      ),
-    );
-  }
-
-  Widget _buildLiveComparison(_FlightData f) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 12, offset: const Offset(0, 4))],
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.compare_arrows_rounded, color: AppTheme.primary, size: 22),
-                const SizedBox(width: 8),
-                const Text('Live Comparison', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text('Selected: ${f.airline}', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-            const SizedBox(height: 16),
-
-            // Other apps row
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(color: const Color(0xFFF4F6F8), borderRadius: BorderRadius.circular(12)),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Other Apps', style: TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
-                  Text('₹4,500', style: TextStyle(fontSize: 13, color: Colors.grey[500], decoration: TextDecoration.lineThrough)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Our price row
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryDark,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Our Price', style: TextStyle(fontSize: 11, color: Colors.white60)),
-                      Text('₹3,900', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white)),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle),
-                    child: const Icon(Icons.check_rounded, color: Colors.white, size: 18),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // Discount applied
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppTheme.primary.withValues(alpha: 0.3)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.local_offer_rounded, size: 16, color: AppTheme.primary),
-                  SizedBox(width: 6),
-                  Text('Discount Applied: ₹600', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.primary)),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-
-            _CheckRow('No Hidden Convenience Fee'),
-            const SizedBox(height: 6),
-            _CheckRow('Instant EMI Eligibility'),
-            const SizedBox(height: 18),
-
-            // Continue to Book
-            SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                onPressed: () {},
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryDark,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                child: const Text('Continue to Book'),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -356,7 +238,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 children: [
                   Icon(icon, color: AppTheme.primary, size: 28),
                   const SizedBox(height: 8),
-                  Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 11, color: AppTheme.textPrimary, fontWeight: FontWeight.w600, height: 1.4)),
+                  Text(label, textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 11, color: AppTheme.textPrimary, fontWeight: FontWeight.w600, height: 1.4)),
                 ],
               ),
             );
@@ -379,52 +262,31 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Need Help with your booking?', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+            const Text('Need help choosing?', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
             const SizedBox(height: 6),
-            const Text('Our flight experts are available 24/7 to assist you with the best routes and fares.', style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.5)),
+            const Text('Our flight experts are available 24/7 to help you pick the best flight and fare.',
+                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary, height: 1.5)),
             const SizedBox(height: 16),
-            // WhatsApp
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _openWhatsApp,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF25D366),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            Row(
+              children: [
+                Expanded(
+                  child: _HelpButton(
+                    label: 'WhatsApp',
+                    icon: Icons.chat_rounded,
+                    color: const Color(0xFF25D366),
+                    onTap: _openWhatsApp,
+                  ),
                 ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.chat_rounded, size: 18),
-                    SizedBox(width: 8),
-                    Text('WhatsApp', style: TextStyle(fontWeight: FontWeight.w700)),
-                  ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _HelpButton(
+                    label: 'Call Us',
+                    icon: Icons.call_rounded,
+                    color: AppTheme.primaryDark,
+                    onTap: _callSupport,
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Call
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _callSupport,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.primaryDark,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.call_rounded, size: 18),
-                    SizedBox(width: 8),
-                    Text('Call Support', style: TextStyle(fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
+              ],
             ),
           ],
         ),
@@ -432,24 +294,70 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
     );
   }
 
+  Widget _buildBottomBar(_FlightData f) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.10), blurRadius: 16, offset: const Offset(0, -4))],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(f.airline, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                Text('${f.dep} → ${f.arr}  •  ${f.duration}',
+                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          SizedBox(
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _goToComparison,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Compare & Book'),
+                  SizedBox(width: 6),
+                  Icon(Icons.arrow_forward_rounded, size: 18),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _openWhatsApp() async {
     const phone = '919876543210';
-    final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent("Hi GenFly! I need help with my booking.")}');
+    final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent("Hi GenFly! I need help choosing a flight.")}');
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {}
   }
 
   Future<void> _callSupport() async {
-    final uri = Uri.parse('tel:+919876543210');
     try {
-      await launchUrl(uri);
+      await launchUrl(Uri.parse('tel:+919876543210'));
     } catch (_) {}
   }
 }
 
 // ---------------------------------------------------------------------------
-// Flight card
+// Flight card — no price shown; price is internal for comparison screen
 // ---------------------------------------------------------------------------
 
 class _FlightCard extends StatelessWidget {
@@ -474,9 +382,7 @@ class _FlightCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: isSelected
-                  ? AppTheme.primary.withValues(alpha: 0.15)
-                  : Colors.black.withValues(alpha: 0.06),
+              color: isSelected ? AppTheme.primary.withValues(alpha: 0.15) : Colors.black.withValues(alpha: 0.06),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -488,20 +394,18 @@ class _FlightCard extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Top row: airline info + price
+                  // Top: airline circle + name + flight no + selection indicator
                   Row(
                     children: [
-                      // Airline circle
                       Container(
-                        width: 40,
-                        height: 40,
+                        width: 42, height: 42,
                         decoration: BoxDecoration(
                           color: data.airlineColor.withValues(alpha: 0.12),
                           shape: BoxShape.circle,
                         ),
                         child: Center(
                           child: Text(data.initial,
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: data.airlineColor)),
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: data.airlineColor)),
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -509,23 +413,26 @@ class _FlightCard extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(data.airline, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                            Text(data.airline, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
                             Text(data.flightNo, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
                           ],
                         ),
                       ),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(data.price, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppTheme.textPrimary)),
-                          Row(
-                            children: [
-                              const Icon(Icons.arrow_downward_rounded, size: 11, color: AppTheme.primary),
-                              const SizedBox(width: 2),
-                              Text(data.saving, style: const TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600)),
-                            ],
+                      // Selection indicator
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 22, height: 22,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected ? AppTheme.primary : Colors.transparent,
+                          border: Border.all(
+                            color: isSelected ? AppTheme.primary : AppTheme.divider,
+                            width: 2,
                           ),
-                        ],
+                        ),
+                        child: isSelected
+                            ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
+                            : null,
                       ),
                     ],
                   ),
@@ -534,18 +441,16 @@ class _FlightCard extends StatelessWidget {
                   const Divider(height: 1, color: Color(0xFFF0F0F0)),
                   const SizedBox(height: 12),
 
-                  // Bottom row: times + duration
+                  // Times + duration row
                   Row(
                     children: [
-                      // Departure
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(data.dep, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textPrimary)),
+                          Text(data.dep, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textPrimary)),
                           Text(data.depCode, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
                         ],
                       ),
-                      // Duration line
                       Expanded(
                         child: Column(
                           children: [
@@ -562,15 +467,14 @@ class _FlightCard extends StatelessWidget {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text(data.stops, style: const TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+                            Text(data.stops, style: const TextStyle(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.w600)),
                           ],
                         ),
                       ),
-                      // Arrival
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text(data.arr, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppTheme.textPrimary)),
+                          Text(data.arr, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.textPrimary)),
                           Text(data.arrCode, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary, fontWeight: FontWeight.w600)),
                         ],
                       ),
@@ -580,16 +484,15 @@ class _FlightCard extends StatelessWidget {
               ),
             ),
 
-            // BEST VALUE badge
+            // BEST VALUE badge — top-left so it never overlaps times
             if (data.isBestValue)
               Positioned(
-                top: 0,
-                right: 0,
+                top: 0, left: 0,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: const BoxDecoration(
                     color: AppTheme.primary,
-                    borderRadius: BorderRadius.only(topRight: Radius.circular(16), bottomLeft: Radius.circular(12)),
+                    borderRadius: BorderRadius.only(topLeft: Radius.circular(16), bottomRight: Radius.circular(12)),
                   ),
                   child: const Row(
                     mainAxisSize: MainAxisSize.min,
@@ -609,27 +512,42 @@ class _FlightCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Small helpers
+// Helpers
 // ---------------------------------------------------------------------------
 
-class _CheckRow extends StatelessWidget {
-  final String text;
-  const _CheckRow(this.text);
+class _HelpButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  const _HelpButton({required this.label, required this.icon, required this.color, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        const Icon(Icons.check_circle_outline_rounded, size: 16, color: AppTheme.primary),
-        const SizedBox(width: 8),
-        Text(text, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
-      ],
+    return SizedBox(
+      height: 46,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 17),
+            const SizedBox(width: 6),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class _FlightData {
-  final String airline, initial, flightNo, dep, arr, depCode, arrCode, duration, stops, price, saving;
+  final String airline, initial, flightNo, dep, arr, depCode, arrCode, duration, stops, genFlyPrice;
   final Color airlineColor;
   final bool isBestValue;
 
@@ -644,8 +562,7 @@ class _FlightData {
     required this.arrCode,
     required this.duration,
     required this.stops,
-    required this.price,
-    required this.saving,
+    required this.genFlyPrice,
     required this.isBestValue,
   });
 }

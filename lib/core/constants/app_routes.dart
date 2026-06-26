@@ -11,6 +11,7 @@ class AppRoutes {
   static const String offers = '/offers';
   static const String support = '/support';
   static const String searchResults = '/search-results';
+  static const String flightComparison = '/flight-comparison';
   static const String flightDetails = '/flight-details';
   static const String seatSelection = '/seat-selection';
   static const String passengerDetails = '/passenger-details';
