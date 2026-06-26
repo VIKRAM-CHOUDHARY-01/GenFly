@@ -19,27 +19,12 @@ final GlobalKey<NavigatorState> _rootNavKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
 
 // ---------------------------------------------------------------------------
-// Circular orbit helpers
-// ---------------------------------------------------------------------------
-//
-// The plane orbits around the screen centre at radius r.
-// Position at orbit angle α (clockwise from 12 o'clock):
-//   x = cx + r·sin(α),   y = cy − r·cos(α)
-//
-// Tangent (direction of travel) at α:
-//   d/dα [sin α, −cos α] = [cos α, sin α]
-//   Screen-coord direction from East = atan2(sin α, cos α) = α
-//
-// Icons.flight_rounded default = NE = atan2(−1, 1) = −π/4.
-// Flutter rotation θ (positive = clockwise): icon direction = −π/4 + θ
-// For icon to point at angle a: -pi/4 + theta = a  =>  theta = a + pi/4
-//
-// This formula is exact for any a — the nose always points tangent to the circle.
-double _orbitAngle(double a) => a + math.pi / 4;
-
-// ---------------------------------------------------------------------------
 // Splash screen
 // ---------------------------------------------------------------------------
+//
+// Straight vertical flight: plane rises from below screen to above.
+// Icons.flight_rounded default = NE (45° upper-right).
+// Rotate -pi/4 (45° CCW) → icon points straight up (North). No guessing.
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -53,55 +38,38 @@ class _SplashScreenState extends State<SplashScreen>
   late final AnimationController _main;
   late final AnimationController _dots;
 
+  late final Animation<double> _contentFade;
   late final Animation<double> _logoScale;
-  late final Animation<double> _logoFade;
-  late final Animation<double> _textFade;
-  late final Animation<Offset> _textSlide;
-  late final Animation<double> _tagFade;
   late final Animation<double> _planeProg;
 
   @override
   void initState() {
     super.initState();
 
-    // Slightly shorter total — snappier feel
     _main = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 2800));
+        vsync: this, duration: const Duration(milliseconds: 2000));
     _dots = AnimationController(
         vsync: this, duration: const Duration(milliseconds: 700))
       ..repeat();
 
-    // Logo: elastic pop starting from frame 0 — no blank green gap
-    _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
+    // Everything fades in together on the very first frame
+    _contentFade = Tween<double>(begin: 0.0, end: 1.0).animate(
         CurvedAnimation(
             parent: _main,
-            curve: const Interval(0.0, 0.48, curve: Curves.elasticOut)));
-    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+            curve: const Interval(0.0, 0.20, curve: Curves.easeOut)));
+
+    _logoScale = Tween<double>(begin: 0.7, end: 1.0).animate(
         CurvedAnimation(
             parent: _main,
-            curve: const Interval(0.0, 0.16, curve: Curves.easeOut)));
+            curve: const Interval(0.0, 0.35, curve: Curves.easeOutBack)));
 
-    _textFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-            parent: _main,
-            curve: const Interval(0.26, 0.46, curve: Curves.easeOut)));
-    _textSlide =
-        Tween<Offset>(begin: const Offset(0.35, 0), end: Offset.zero).animate(
-            CurvedAnimation(
-                parent: _main,
-                curve: const Interval(0.26, 0.48, curve: Curves.easeOutCubic)));
-
-    _tagFade = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
-        parent: _main,
-        curve: const Interval(0.42, 0.60, curve: Curves.easeOut)));
-
-    // Orbit progress: plane becomes visible after logo pops in
+    // Plane flies bottom→top over full animation window
     _planeProg = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _main, curve: const Interval(0.18, 0.96)));
+        CurvedAnimation(parent: _main, curve: const Interval(0.0, 1.0)));
 
     _main.forward();
 
-    Future.delayed(const Duration(milliseconds: 3300), () {
+    Future.delayed(const Duration(milliseconds: 2400), () {
       if (mounted) context.go(AppRoutes.home);
     });
   }
@@ -116,60 +84,42 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    const iconHalf = 22.0;
 
     return Scaffold(
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF071E12), Color(0xFF0D3B2E), Color(0xFF0A2E20)],
-          ),
-        ),
+        // Solid #0D3B2E matches the native Android splash exactly —
+        // no visible colour jump when Flutter takes over.
+        color: const Color(0xFF0D3B2E),
         child: Stack(
           children: [
-            ..._buildClouds(size),
-
-            // Orbit ring — static circle the plane flies along
-            CustomPaint(
-              size: size,
-              painter: _OrbitRingPainter(),
-            ),
-
-            // Orbiting airplane
+            // Airplane: straight up, nose pointing north
             AnimatedBuilder(
-              animation: _main,
+              animation: _planeProg,
               builder: (_, __) {
-                final progress = _planeProg.value;
-                if (progress <= 0) return const SizedBox.shrink();
-
-                // 1.5 revolutions over the visible window
-                final a = 3 * math.pi * progress;
-                final cx = size.width / 2;
-                final cy = size.height / 2;
-                const r = 130.0;
-                const iconHalf = 22.0;
-
-                // Fade in during first 15% of orbit, fade out during last 15%
-                final t = _main.value;
-                final opacity = t < 0.28
-                    ? ((t - 0.18) / 0.10).clamp(0.0, 1.0)
-                    : t > 0.86
-                        ? ((0.96 - t) / 0.10).clamp(0.0, 1.0)
+                final p = _planeProg.value;
+                // Enter from 10% below screen, exit 10% above screen
+                final y = size.height * (1.10 - p * 1.25) - iconHalf;
+                final x = size.width / 2 - iconHalf;
+                // Fade in first 10%, fade out last 20%
+                final opacity = p < 0.10
+                    ? p / 0.10
+                    : p > 0.80
+                        ? (1.0 - p) / 0.20
                         : 1.0;
-
                 return Positioned(
-                  left: cx + r * math.sin(a) - iconHalf,
-                  top: cy - r * math.cos(a) - iconHalf,
+                  left: x,
+                  top: y,
                   child: Opacity(
-                    opacity: opacity,
+                    opacity: opacity.clamp(0.0, 1.0),
                     child: Transform.rotate(
-                      angle: _orbitAngle(a),
+                      // NE default icon → rotate -pi/4 → points straight up
+                      angle: -math.pi / 4,
                       child: Icon(
                         Icons.flight_rounded,
-                        color: Colors.white.withValues(alpha: 0.92),
+                        color: Colors.white.withValues(alpha: 0.90),
                         size: 44,
                       ),
                     ),
@@ -178,42 +128,33 @@ class _SplashScreenState extends State<SplashScreen>
               },
             ),
 
-            // Center content: logo + brand name + tagline
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ScaleTransition(
-                    scale: _logoScale,
-                    child: FadeTransition(
-                      opacity: _logoFade,
+            // Logo + brand + tagline — all fade in together immediately
+            FadeTransition(
+              opacity: _contentFade,
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ScaleTransition(
+                      scale: _logoScale,
                       child: Image.asset(
                         'assets/images/New_logo.png',
                         height: 110,
                         fit: BoxFit.contain,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 20),
-                  FadeTransition(
-                    opacity: _textFade,
-                    child: SlideTransition(
-                      position: _textSlide,
-                      child: const Text(
-                        'GenFly',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 3.0,
-                        ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'GenFly',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 48,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 3.0,
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  FadeTransition(
-                    opacity: _tagFade,
-                    child: const Text(
+                    const SizedBox(height: 10),
+                    const Text(
                       'Fly Smart. Fly Easy.',
                       style: TextStyle(
                         color: Colors.white54,
@@ -222,12 +163,12 @@ class _SplashScreenState extends State<SplashScreen>
                         fontWeight: FontWeight.w400,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
 
-            // Pulsing dots
+            // Pulsing dots at the bottom
             Positioned(
               bottom: 54,
               left: 0,
@@ -239,13 +180,13 @@ class _SplashScreenState extends State<SplashScreen>
                   children: List.generate(3, (i) {
                     final phase =
                         ((_dots.value - i * 0.33) % 1.0).clamp(0.0, 1.0);
-                    final opacity = 0.20 + 0.80 * math.sin(phase * math.pi);
+                    final op = 0.20 + 0.80 * math.sin(phase * math.pi);
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 5),
                       width: 7,
                       height: 7,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: opacity),
+                        color: Colors.white.withValues(alpha: op),
                         shape: BoxShape.circle,
                       ),
                     );
@@ -258,49 +199,6 @@ class _SplashScreenState extends State<SplashScreen>
       ),
     );
   }
-
-  List<Widget> _buildClouds(Size size) {
-    const specs = [
-      (0.06, 0.10, 80.0, 0.04),
-      (0.70, 0.07, 95.0, 0.035),
-      (0.80, 0.30, 60.0, 0.05),
-      (0.10, 0.45, 70.0, 0.03),
-      (0.50, 0.65, 55.0, 0.04),
-      (0.30, 0.80, 75.0, 0.03),
-    ];
-    return specs.map((s) {
-      final (dx, dy, sz, alpha) = s;
-      return Positioned(
-        left: dx * size.width,
-        top: dy * size.height,
-        child: Icon(Icons.cloud_rounded,
-            size: sz, color: Colors.white.withValues(alpha: alpha)),
-      );
-    }).toList();
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Orbit ring painter — the circular path the plane follows
-// ---------------------------------------------------------------------------
-
-class _OrbitRingPainter extends CustomPainter {
-  const _OrbitRingPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.drawCircle(
-      Offset(size.width / 2, size.height / 2),
-      130.0,
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.12)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.0,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_OrbitRingPainter old) => false;
 }
 
 // ---------------------------------------------------------------------------
