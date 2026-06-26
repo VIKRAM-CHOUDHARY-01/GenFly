@@ -21,51 +21,26 @@ final GlobalKey<NavigatorState> _rootNavKey =
 // ---------------------------------------------------------------------------
 // Plane position helpers — shared between the plane icon and contrail painter
 // ---------------------------------------------------------------------------
+//
+// Flight path: diagonal bottom-left → top-right.
+// Icons.flight_rounded default orientation = NE (45° upper-right).
+// At angle=0.0 the icon nose points exactly in the direction of travel — no
+// rotation math required. The plane stays physically consistent throughout.
 
-// X: accelerates from off-screen left along the runway, then constant speed
+// X: smooth acceleration from off-screen left to off-screen right
 double _planeX(double t, double w) {
-  if (t < 0.38) {
-    return (-0.55 + Curves.easeIn.transform(t / 0.38) * 1.00) * w;
-  }
-  return (0.45 + ((t - 0.38) / 0.62) * 1.45) * w;
+  final e = t * t * (3.0 - 2.0 * t); // smoothstep: ease in-out
+  return (-0.15 + e * 1.45) * w;
 }
 
-// Y: stays at ground level until liftoff, then climbs smoothly
+// Y: climbs steadily — starts near bottom, exits above screen
 double _planeY(double t, double h) {
-  const g = 0.72; // ground level: 72% from top
-  if (t < 0.50) return g * h;
-  final ct = (t - 0.50) / 0.50;
-  // easeInOut: gentle start to liftoff, smooth level-off at top
-  return (g - Curves.easeInOut.transform(ct) * 0.60) * h;
+  return (0.84 - Curves.easeInOut.transform(t) * 1.28) * h;
 }
 
-// Angle: hand-crafted 3-phase curve for a visually correct takeoff
-//
-//   Icons.flight_rounded default = NE (upper-right, 45° from horizontal).
-//   Flutter rotation r: positive = clockwise.
-//   Direction = 45° − r_degrees from horizontal.
-//
-//   r = π/4  → plane points East  (0°, level) — runway roll
-//   r = 0    → plane points NE   (45°)        — moderate climb
-//   r ≈ −0.2 → plane points ~55° above horizontal — steep liftoff climb
-double _planeAngle(double t) {
-  // Phase 1: runway roll — nose level, pointing right
-  if (t <= 0.36) return math.pi / 4;
-
-  // Phase 2: nose pitches UP — from level (π/4) to steep climb (-0.18 rad ≈ 55°)
-  if (t <= 0.54) {
-    final pt = Curves.easeInOut.transform((t - 0.36) / 0.18);
-    return math.pi / 4 + (-0.18 - math.pi / 4) * pt;
-    // at pt=0: π/4 (level)   at pt=1: -0.18 (steeply pitched up)
-  }
-
-  // Phase 3: steady climb at ~55°
-  if (t <= 0.78) return -0.18;
-
-  // Phase 4: gradually level off as plane exits screen
-  final lt = Curves.easeOut.transform((t - 0.78) / 0.22);
-  return -0.18 + lt * (math.pi / 4 + 0.18); // returns toward π/4
-}
+// Icon at angle=0 points NE — matches the diagonal travel direction exactly.
+// No rotation needed.
+double _planeAngle(double t) => 0.0;
 
 // ---------------------------------------------------------------------------
 // Splash screen
@@ -132,7 +107,7 @@ class _SplashScreenState extends State<SplashScreen>
     _planeFade = Tween<double>(begin: 1.0, end: 0.0).animate(
         CurvedAnimation(
             parent: _main,
-            curve: const Interval(0.78, 0.90, curve: Curves.easeIn)));
+            curve: const Interval(0.65, 0.82, curve: Curves.easeIn)));
 
     _main.forward();
 

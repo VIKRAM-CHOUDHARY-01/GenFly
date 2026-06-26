@@ -323,25 +323,23 @@ class FlightComparisonScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          SizedBox(
-            height: 52,
-            child: ElevatedButton(
-              onPressed: () {
-                // TODO: Navigate to passenger details / seat selection
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Booking flow coming soon!'), backgroundColor: AppTheme.primaryDark),
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                elevation: 4,
-                shadowColor: AppTheme.primary.withValues(alpha: 0.4),
-              ),
-              child: const Text('Proceed to Book', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+          ElevatedButton(
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Booking flow coming soon!'), backgroundColor: AppTheme.primaryDark),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              elevation: 4,
+              shadowColor: AppTheme.primary.withValues(alpha: 0.4),
             ),
+            child: const Text('Proceed to Book', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
           ),
         ],
       ),

@@ -315,25 +315,24 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
             ),
           ),
           const SizedBox(width: 12),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _goToComparison,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Compare & Book'),
-                  SizedBox(width: 6),
-                  Icon(Icons.arrow_forward_rounded, size: 18),
-                ],
-              ),
+          ElevatedButton(
+            onPressed: _goToComparison,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Compare & Book'),
+                SizedBox(width: 6),
+                Icon(Icons.arrow_forward_rounded, size: 18),
+              ],
             ),
           ),
         ],
