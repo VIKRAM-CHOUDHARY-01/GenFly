@@ -199,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           onPressed: () => Scaffold.of(ctx).openDrawer(),
         ),
       ),
-      titleSpacing: 4.0,
+      titleSpacing: 0,
       title: Image.asset('assets/images/New_logo.png', height: 64, fit: BoxFit.contain),
       centerTitle: false,
       actions: [

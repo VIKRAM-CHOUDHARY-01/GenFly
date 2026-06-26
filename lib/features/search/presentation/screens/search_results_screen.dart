@@ -140,13 +140,6 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
         ],
       ),
       centerTitle: false,
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.tune_rounded),
-          onPressed: () {},
-          tooltip: 'Filter',
-        ),
-      ],
       elevation: 0,
     );
   }
@@ -483,23 +476,28 @@ class _FlightCard extends StatelessWidget {
               ),
             ),
 
-            // BEST VALUE badge — top-left so it never overlaps times
+            // BEST VALUE badge — centered at top of card
             if (data.isBestValue)
               Positioned(
-                top: 0, left: 0,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: const BoxDecoration(
-                    color: AppTheme.primary,
-                    borderRadius: BorderRadius.only(topLeft: Radius.circular(16), bottomRight: Radius.circular(12)),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.workspace_premium_rounded, size: 12, color: Colors.white),
-                      SizedBox(width: 3),
-                      Text('BEST VALUE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
-                    ],
+                top: 0, left: 0, right: 0,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primary,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(10),
+                        bottomRight: Radius.circular(10),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.workspace_premium_rounded, size: 11, color: Colors.white),
+                        SizedBox(width: 4),
+                        Text('BEST VALUE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Colors.white, letterSpacing: 0.5)),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -523,23 +521,23 @@ class _HelpButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 46,
-      child: ElevatedButton(
-        onPressed: onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 17),
-            const SizedBox(width: 6),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-          ],
-        ),
+    return ElevatedButton(
+      onPressed: onTap,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        padding: const EdgeInsets.symmetric(vertical: 13),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 17),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+        ],
       ),
     );
   }

@@ -19,28 +19,23 @@ final GlobalKey<NavigatorState> _rootNavKey =
     GlobalKey<NavigatorState>(debugLabel: 'root');
 
 // ---------------------------------------------------------------------------
-// Plane position helpers — shared between the plane icon and contrail painter
+// Circular orbit helpers
 // ---------------------------------------------------------------------------
 //
-// Flight path: diagonal bottom-left → top-right.
-// Icons.flight_rounded default orientation = NE (45° upper-right).
-// At angle=0.0 the icon nose points exactly in the direction of travel — no
-// rotation math required. The plane stays physically consistent throughout.
-
-// X: smooth acceleration from off-screen left to off-screen right
-double _planeX(double t, double w) {
-  final e = t * t * (3.0 - 2.0 * t); // smoothstep: ease in-out
-  return (-0.15 + e * 1.45) * w;
-}
-
-// Y: climbs steadily — starts near bottom, exits above screen
-double _planeY(double t, double h) {
-  return (0.84 - Curves.easeInOut.transform(t) * 1.28) * h;
-}
-
-// Icon at angle=0 points NE — matches the diagonal travel direction exactly.
-// No rotation needed.
-double _planeAngle(double t) => 0.0;
+// The plane orbits around the screen centre at radius r.
+// Position at orbit angle α (clockwise from 12 o'clock):
+//   x = cx + r·sin(α),   y = cy − r·cos(α)
+//
+// Tangent (direction of travel) at α:
+//   d/dα [sin α, −cos α] = [cos α, sin α]
+//   Screen-coord direction from East = atan2(sin α, cos α) = α
+//
+// Icons.flight_rounded default = NE = atan2(−1, 1) = −π/4.
+// Flutter rotation θ (positive = clockwise): icon direction = −π/4 + θ
+// For icon to point at α: −π/4 + θ = α  →  θ = α + π/4
+//
+// This formula is exact for any α — the nose always points tangent to the circle.
+double _orbitAngle(double α) => α + math.pi / 4;
 
 // ---------------------------------------------------------------------------
 // Splash screen
@@ -64,7 +59,6 @@ class _SplashScreenState extends State<SplashScreen>
   late final Animation<Offset> _textSlide;
   late final Animation<double> _tagFade;
   late final Animation<double> _planeProg;
-  late final Animation<double> _planeFade;
 
   @override
   void initState() {
@@ -101,13 +95,9 @@ class _SplashScreenState extends State<SplashScreen>
         parent: _main,
         curve: const Interval(0.42, 0.60, curve: Curves.easeOut)));
 
-    // Plane starts at t=0: runway is visible from the very first Flutter frame
+    // Orbit progress: plane becomes visible after logo pops in
     _planeProg = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _main, curve: const Interval(0.0, 0.88)));
-    _planeFade = Tween<double>(begin: 1.0, end: 0.0).animate(
-        CurvedAnimation(
-            parent: _main,
-            curve: const Interval(0.65, 0.82, curve: Curves.easeIn)));
+        CurvedAnimation(parent: _main, curve: const Interval(0.18, 0.96)));
 
     _main.forward();
 
@@ -142,27 +132,41 @@ class _SplashScreenState extends State<SplashScreen>
           children: [
             ..._buildClouds(size),
 
-            // Contrail behind the plane
-            AnimatedBuilder(
-              animation: _planeProg,
-              builder: (_, __) => CustomPaint(
-                size: size,
-                painter: _ContrailPainter(progress: _planeProg.value),
-              ),
+            // Orbit ring — static circle the plane flies along
+            CustomPaint(
+              size: size,
+              painter: _OrbitRingPainter(),
             ),
 
-            // Animated airplane
+            // Orbiting airplane
             AnimatedBuilder(
               animation: _main,
               builder: (_, __) {
-                final t = _planeProg.value;
+                final progress = _planeProg.value;
+                if (progress <= 0) return const SizedBox.shrink();
+
+                // 1.5 revolutions over the visible window
+                final α = 3 * math.pi * progress;
+                final cx = size.width / 2;
+                final cy = size.height / 2;
+                const r = 130.0;
+                const iconHalf = 22.0;
+
+                // Fade in during first 15% of orbit, fade out during last 15%
+                final t = _main.value;
+                final opacity = t < 0.28
+                    ? ((t - 0.18) / 0.10).clamp(0.0, 1.0)
+                    : t > 0.86
+                        ? ((0.96 - t) / 0.10).clamp(0.0, 1.0)
+                        : 1.0;
+
                 return Positioned(
-                  left: _planeX(t, size.width),
-                  top: _planeY(t, size.height),
+                  left: cx + r * math.sin(α) - iconHalf,
+                  top: cy - r * math.cos(α) - iconHalf,
                   child: Opacity(
-                    opacity: _planeFade.value.clamp(0.0, 1.0),
+                    opacity: opacity,
                     child: Transform.rotate(
-                      angle: _planeAngle(t),
+                      angle: _orbitAngle(α),
                       child: Icon(
                         Icons.flight_rounded,
                         color: Colors.white.withValues(alpha: 0.92),
@@ -277,35 +281,26 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 // ---------------------------------------------------------------------------
-// Contrail painter
+// Orbit ring painter — the circular path the plane follows
 // ---------------------------------------------------------------------------
 
-class _ContrailPainter extends CustomPainter {
-  final double progress;
-  const _ContrailPainter({required this.progress});
+class _OrbitRingPainter extends CustomPainter {
+  const _OrbitRingPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (progress < 0.03) return;
-    const trailCount = 14;
-    const iconHalf = 22.0;
-    for (int i = 1; i <= trailCount; i++) {
-      final t = (progress - i * 0.025).clamp(0.0, 1.0);
-      if (t <= 0) break;
-      final x = _planeX(t, size.width) + iconHalf;
-      final y = _planeY(t, size.height) + iconHalf;
-      final alpha = (1 - i / trailCount) * 0.22 * progress;
-      final radius = (1 - i / trailCount) * 3.2;
-      canvas.drawCircle(
-        Offset(x, y),
-        radius,
-        Paint()..color = Colors.white.withValues(alpha: alpha.clamp(0.0, 1.0)),
-      );
-    }
+    canvas.drawCircle(
+      Offset(size.width / 2, size.height / 2),
+      130.0,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.12)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.0,
+    );
   }
 
   @override
-  bool shouldRepaint(_ContrailPainter old) => old.progress != progress;
+  bool shouldRepaint(_OrbitRingPainter old) => false;
 }
 
 // ---------------------------------------------------------------------------
