@@ -10,6 +10,7 @@ import '../../features/offers/presentation/screens/offers_screen.dart';
 import '../../features/support/presentation/screens/support_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
+import '../../features/search/presentation/screens/search_results_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Splash screen — single seamless screen, matches native splash green exactly
@@ -47,7 +48,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   void initState() {
     super.initState();
 
-    _main = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
+    _main = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200));
     _dots = AnimationController(vsync: this, duration: const Duration(milliseconds: 750))..repeat();
 
     // Logo pops in from center with elastic bounce
@@ -74,7 +75,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
 
     _main.forward();
 
-    Future.delayed(const Duration(milliseconds: 2900), () {
+    Future.delayed(const Duration(milliseconds: 4000), () {
       if (mounted) context.go(AppRoutes.home);
     });
   }
@@ -115,8 +116,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 // Arc path: bottom-left → top-right with a slight upward bow
                 final x = (-0.55 + t * 2.2) * size.width;
                 final y = (0.72 - t * 0.60 - 0.18 * math.sin(t * math.pi)) * size.height;
-                // Tilt matches flight direction
-                const angle = -math.pi / 6.5;
+                // Tilt: shallow climb angle matching arc derivative
+                final angle = -math.pi / 10 + (t * math.pi / 22);
                 return Positioned(
                   left: x,
                   top: y,
@@ -338,6 +339,23 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: AppRoutes.notifications,
       pageBuilder: (context, state) => _slideRightPage(child: const NotificationsScreen(), state: state),
+    ),
+    GoRoute(
+      path: AppRoutes.searchResults,
+      pageBuilder: (context, state) {
+        final e = (state.extra as Map<String, String>?) ?? {};
+        return _slideRightPage(
+          child: SearchResultsScreen(
+            from: e['from'] ?? 'Delhi',
+            fromCode: e['fromCode'] ?? 'DEL',
+            to: e['to'] ?? 'Mumbai',
+            toCode: e['toCode'] ?? 'BOM',
+            date: e['date'] ?? '',
+            travellers: e['travellers'] ?? '1 Adult, Economy',
+          ),
+          state: state,
+        );
+      },
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) => MainScaffold(navigationShell: navigationShell),

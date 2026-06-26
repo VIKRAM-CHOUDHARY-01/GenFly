@@ -16,20 +16,38 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  // Search state
   String _from = 'Delhi';
   String _fromCode = 'DEL';
   String _to = 'Mumbai';
   String _toCode = 'BOM';
-  String _date = '25 Jun 2026';
-  String _travellers = '1 Adult, Economy';
+  DateTime _departureDate = DateTime.now().add(const Duration(days: 1));
   bool _isRoundTrip = false;
 
+  // Travellers
+  int _adults = 1;
+  int _children = 0;
+  int _infants = 0;
+  String _cabinClass = 'Economy';
+
+  // Swap animation
   late AnimationController _swapController;
   late Animation<double> _swapRotation;
 
+  // Promo slider
   final PageController _sliderController = PageController();
   int _currentSlide = 0;
   Timer? _sliderTimer;
+
+  String get _travellers {
+    final total = _adults + _children + _infants;
+    return '$total ${total == 1 ? 'Traveller' : 'Travellers'}, $_cabinClass';
+  }
+
+  String get _dateLabel {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    return '${_departureDate.day} ${months[_departureDate.month - 1]} ${_departureDate.year}';
+  }
 
   static const _slides = [
     _SlideData(
@@ -68,11 +86,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _sliderTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       if (!mounted) return;
       final next = (_currentSlide + 1) % _slides.length;
-      _sliderController.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 600),
-        curve: Curves.easeInOutCubic,
-      );
+      _sliderController.animateToPage(next, duration: const Duration(milliseconds: 600), curve: Curves.easeInOutCubic);
     });
   }
 
@@ -87,26 +101,66 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _swapCities() {
     _swapController.forward(from: 0);
     setState(() {
-      final tempCity = _from;
-      _from = _to;
-      _to = tempCity;
-      final tempCode = _fromCode;
-      _fromCode = _toCode;
-      _toCode = tempCode;
+      final tempCity = _from; _from = _to; _to = tempCity;
+      final tempCode = _fromCode; _fromCode = _toCode; _toCode = tempCode;
+    });
+  }
+
+  Future<void> _pickDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _departureDate.isBefore(now) ? now : _departureDate,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      builder: (ctx, child) => Theme(
+        data: Theme.of(ctx).copyWith(
+          colorScheme: const ColorScheme.light(
+            primary: AppTheme.primary,
+            onPrimary: Colors.white,
+            onSurface: AppTheme.textPrimary,
+          ),
+        ),
+        child: child!,
+      ),
+    );
+    if (picked != null) setState(() => _departureDate = picked);
+  }
+
+  Future<void> _pickTravellers() async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _TravellersSheet(
+        adults: _adults,
+        children: _children,
+        infants: _infants,
+        cabinClass: _cabinClass,
+        onApply: (a, c, i, cls) => setState(() {
+          _adults = a; _children = c; _infants = i; _cabinClass = cls;
+        }),
+      ),
+    );
+  }
+
+  void _searchFlights() {
+    context.push(AppRoutes.searchResults, extra: {
+      'from': _from,
+      'fromCode': _fromCode,
+      'to': _to,
+      'toCode': _toCode,
+      'date': _dateLabel,
+      'travellers': _travellers,
     });
   }
 
   Future<void> _openWhatsApp() async {
-    // Replace with your actual WhatsApp support number (country code + number, no +)
     const phone = '919876543210';
-    const message = 'Hi GenFly! I need help with my booking.';
-    final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent(message)}');
+    final uri = Uri.parse('https://wa.me/$phone?text=${Uri.encodeComponent("Hi GenFly! I need help with my booking.")}');
     try {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      // Fallback: open wa.me in browser
-      await launchUrl(uri, mode: LaunchMode.externalNonBrowserApplication);
-    }
+    } catch (_) {}
   }
 
   @override
@@ -120,7 +174,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         slivers: [
           _buildAppBar(),
           SliverToBoxAdapter(child: _buildSlider()),
-          // Clear visual gap — no negative translate pulling the card into the slider
           const SliverToBoxAdapter(child: SizedBox(height: 20)),
           SliverToBoxAdapter(
             child: AnimatedSection(
@@ -145,12 +198,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           onPressed: () => Scaffold.of(ctx).openDrawer(),
         ),
       ),
-      // App logo: clipped to a rounded square so background square disappears
-      title: Image.asset(
-        'assets/images/New_logo.png',
-        height: 46,
-        fit: BoxFit.contain,
-      ),
+      title: Image.asset('assets/images/New_logo.png', height: 56, fit: BoxFit.contain),
       centerTitle: false,
       actions: [
         IconButton(
@@ -181,24 +229,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             itemBuilder: (_, i) => _SlideCard(data: _slides[i]),
           ),
           Positioned(
-            bottom: 14,
-            left: 0,
-            right: 0,
+            bottom: 14, left: 0, right: 0,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                _slides.length,
-                (i) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  width: _currentSlide == i ? 22 : 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: _currentSlide == i ? Colors.white : Colors.white38,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
+              children: List.generate(_slides.length, (i) => AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                margin: const EdgeInsets.symmetric(horizontal: 3),
+                width: _currentSlide == i ? 22 : 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: _currentSlide == i ? Colors.white : Colors.white38,
+                  borderRadius: BorderRadius.circular(3),
                 ),
-              ),
+              )),
             ),
           ),
         ],
@@ -208,23 +251,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildSearchCard() {
     return Padding(
-      // No negative offset — sits cleanly below the slider gap
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Container(
         decoration: BoxDecoration(
           color: AppTheme.surface,
           borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.12), blurRadius: 20, offset: const Offset(0, 8))],
         ),
         child: Column(
           children: [
-            // Gradient header with trip type toggle
+            // Gradient trip toggle header
             Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(colors: AppTheme.brandGradient),
@@ -233,17 +269,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
               child: Row(
                 children: [
-                  _TripChip(
-                    label: 'One Way',
-                    selected: !_isRoundTrip,
-                    onTap: () => setState(() => _isRoundTrip = false),
-                  ),
+                  _TripChip(label: 'One Way', selected: !_isRoundTrip, onTap: () => setState(() => _isRoundTrip = false)),
                   const SizedBox(width: 10),
-                  _TripChip(
-                    label: 'Round Trip',
-                    selected: _isRoundTrip,
-                    onTap: () => setState(() => _isRoundTrip = true),
-                  ),
+                  _TripChip(label: 'Round Trip', selected: _isRoundTrip, onTap: () => setState(() => _isRoundTrip = true)),
                   const Spacer(),
                   const Icon(Icons.tune_rounded, color: Colors.white70, size: 20),
                 ],
@@ -254,17 +282,21 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
+                  // Large airport code row
                   _buildCityRow(),
                   const SizedBox(height: 16),
                   _FlightPathDivider(isRoundTrip: _isRoundTrip),
                   const SizedBox(height: 16),
+
+                  // Date row
                   Row(
                     children: [
                       Expanded(
                         child: _InfoTile(
                           icon: Icons.calendar_today_rounded,
                           label: 'DEPARTURE',
-                          value: _date,
+                          value: _dateLabel,
+                          onTap: _pickDate,
                         ),
                       ),
                       if (_isRoundTrip) ...[
@@ -274,24 +306,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                             icon: Icons.event_available_rounded,
                             label: 'RETURN',
                             value: 'Select date',
+                            onTap: _pickDate,
                           ),
                         ),
                       ],
                     ],
                   ),
                   const SizedBox(height: 12),
+
+                  // Travellers
                   _InfoTile(
                     icon: Icons.people_outline_rounded,
                     label: 'TRAVELLERS & CLASS',
                     value: _travellers,
+                    onTap: _pickTravellers,
                     trailing: const Icon(Icons.keyboard_arrow_down_rounded, size: 20, color: AppTheme.textSecondary),
                   ),
                   const SizedBox(height: 18),
+
+                  // Search button
                   SizedBox(
                     width: double.infinity,
                     height: 54,
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: _searchFlights,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppTheme.primary,
                         foregroundColor: Colors.white,
@@ -304,10 +342,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                         children: [
                           Icon(Icons.search_rounded, size: 22),
                           SizedBox(width: 8),
-                          Text(
-                            'Search Flights',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 0.3),
-                          ),
+                          Text('Search Flights', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
                         ],
                       ),
                     ),
@@ -348,9 +383,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               decoration: BoxDecoration(
                 gradient: const LinearGradient(colors: AppTheme.brandGradient),
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: AppTheme.primary.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4)),
-                ],
+                boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.35), blurRadius: 10, offset: const Offset(0, 4))],
               ),
               child: const Icon(Icons.swap_horiz_rounded, color: Colors.white, size: 22),
             ),
@@ -375,7 +408,231 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 }
 
-// --- WhatsApp FAB with proper icon ---
+// ---------------------------------------------------------------------------
+// Travellers bottom sheet
+// ---------------------------------------------------------------------------
+
+class _TravellersSheet extends StatefulWidget {
+  final int adults, children, infants;
+  final String cabinClass;
+  final void Function(int adults, int children, int infants, String cabinClass) onApply;
+
+  const _TravellersSheet({
+    required this.adults,
+    required this.children,
+    required this.infants,
+    required this.cabinClass,
+    required this.onApply,
+  });
+
+  @override
+  State<_TravellersSheet> createState() => _TravellersSheetState();
+}
+
+class _TravellersSheetState extends State<_TravellersSheet> {
+  late int _adults;
+  late int _children;
+  late int _infants;
+  late String _cabinClass;
+
+  static const _classes = ['Economy', 'Premium Economy', 'Business', 'First Class'];
+
+  @override
+  void initState() {
+    super.initState();
+    _adults = widget.adults;
+    _children = widget.children;
+    _infants = widget.infants;
+    _cabinClass = widget.cabinClass;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom + 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 14),
+            width: 44,
+            height: 4,
+            decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+          ),
+          const Text('Travellers & Class', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+          const SizedBox(height: 20),
+
+          // Counter rows
+          _CounterRow(label: 'Adults', sub: '12+ yrs', value: _adults, min: 1, max: 9,
+              onChanged: (v) => setState(() => _adults = v)),
+          _CounterRow(label: 'Children', sub: '2–11 yrs', value: _children, max: 6,
+              onChanged: (v) => setState(() => _children = v)),
+          _CounterRow(label: 'Infants', sub: 'Under 2', value: _infants, max: _adults,
+              onChanged: (v) => setState(() => _infants = v)),
+
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Divider(height: 1),
+          ),
+
+          // Cabin class chips
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Cabin Class', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _classes.map((cls) => _ClassChip(
+                    label: cls,
+                    selected: _cabinClass == cls,
+                    onTap: () => setState(() => _cabinClass = cls),
+                  )).toList(),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Apply button
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: SizedBox(
+              width: double.infinity,
+              height: 52,
+              child: ElevatedButton(
+                onPressed: () {
+                  widget.onApply(_adults, _children, _infants, _cabinClass);
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                child: const Text('Apply'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CounterRow extends StatelessWidget {
+  final String label, sub;
+  final int value, max;
+  final int min;
+  final ValueChanged<int> onChanged;
+
+  const _CounterRow({
+    required this.label,
+    required this.sub,
+    required this.value,
+    required this.max,
+    required this.onChanged,
+    this.min = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                Text(sub, style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+              ],
+            ),
+          ),
+          _CounterButton(
+            icon: Icons.remove_rounded,
+            enabled: value > min,
+            onTap: () => onChanged(value - 1),
+          ),
+          SizedBox(
+            width: 40,
+            child: Text('$value', textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+          ),
+          _CounterButton(
+            icon: Icons.add_rounded,
+            enabled: value < max,
+            onTap: () => onChanged(value + 1),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CounterButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+  const _CounterButton({required this.icon, required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: enabled ? AppTheme.primary.withValues(alpha: 0.1) : Colors.grey.withValues(alpha: 0.1),
+          shape: BoxShape.circle,
+          border: Border.all(color: enabled ? AppTheme.primary.withValues(alpha: 0.4) : Colors.grey.withValues(alpha: 0.2)),
+        ),
+        child: Icon(icon, size: 18, color: enabled ? AppTheme.primary : Colors.grey[400]),
+      ),
+    );
+  }
+}
+
+class _ClassChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ClassChip({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppTheme.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? AppTheme.primary : AppTheme.divider),
+        ),
+        child: Text(label,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : AppTheme.textSecondary)),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// WhatsApp FAB
+// ---------------------------------------------------------------------------
 
 class _WhatsAppFab extends StatelessWidget {
   final VoidCallback onTap;
@@ -386,18 +643,11 @@ class _WhatsAppFab extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 58,
-        height: 58,
+        width: 58, height: 58,
         decoration: BoxDecoration(
           color: const Color(0xFF25D366),
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF25D366).withValues(alpha: 0.50),
-              blurRadius: 16,
-              offset: const Offset(0, 6),
-            ),
-          ],
+          boxShadow: [BoxShadow(color: const Color(0xFF25D366).withValues(alpha: 0.50), blurRadius: 16, offset: const Offset(0, 6))],
         ),
         child: CustomPaint(painter: _WhatsAppIconPainter()),
       ),
@@ -408,18 +658,12 @@ class _WhatsAppFab extends StatelessWidget {
 class _WhatsAppIconPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
+    final paint = Paint()..color = Colors.white..style = PaintingStyle.fill;
     final cx = size.width / 2;
     final cy = size.height / 2;
-    final r = size.width * 0.36; // speech-bubble radius
+    final r = size.width * 0.36;
 
-    // Draw speech bubble circle
     canvas.drawCircle(Offset(cx, cy - 1), r, paint);
-
-    // Speech bubble tail (bottom-left)
     final tail = Path()
       ..moveTo(cx - r * 0.5, cy + r * 0.7)
       ..lineTo(cx - r * 1.0, cy + r * 1.1)
@@ -427,37 +671,14 @@ class _WhatsAppIconPainter extends CustomPainter {
       ..close();
     canvas.drawPath(tail, paint);
 
-    // Draw phone handset inside the bubble in green
-    final phonePaint = Paint()
-      ..color = const Color(0xFF25D366)
-      ..style = PaintingStyle.fill;
-
+    final phonePaint = Paint()..color = const Color(0xFF25D366)..style = PaintingStyle.fill;
     canvas.save();
     canvas.translate(cx, cy - 1);
-    // Rotate 40° counter-clockwise to mimic WhatsApp handset angle
     canvas.rotate(-math.pi / 4.5);
-
-    final s = size.width * 0.11; // scale factor for handset parts
-
-    // Earpiece oval (top)
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(0, -s * 1.8), width: s * 1.7, height: s * 1.2),
-      phonePaint,
-    );
-    // Connecting grip bar
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset.zero, width: s * 1.1, height: s * 2.6),
-        Radius.circular(s * 0.4),
-      ),
-      phonePaint,
-    );
-    // Mouthpiece oval (bottom)
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset(0, s * 1.8), width: s * 1.7, height: s * 1.2),
-      phonePaint,
-    );
-
+    final s = size.width * 0.11;
+    canvas.drawOval(Rect.fromCenter(center: Offset(0, -s * 1.8), width: s * 1.7, height: s * 1.2), phonePaint);
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: Offset.zero, width: s * 1.1, height: s * 2.6), Radius.circular(s * 0.4)), phonePaint);
+    canvas.drawOval(Rect.fromCenter(center: Offset(0, s * 1.8), width: s * 1.7, height: s * 1.2), phonePaint);
     canvas.restore();
   }
 
@@ -465,18 +686,15 @@ class _WhatsAppIconPainter extends CustomPainter {
   bool shouldRepaint(_) => false;
 }
 
-// --- Slider ---
+// ---------------------------------------------------------------------------
+// Slider widgets
+// ---------------------------------------------------------------------------
 
 class _SlideData {
   final IconData icon;
   final String title, subtitle;
   final List<Color> gradient;
-  const _SlideData({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.gradient,
-  });
+  const _SlideData({required this.icon, required this.title, required this.subtitle, required this.gradient});
 }
 
 class _SlideCard extends StatelessWidget {
@@ -487,11 +705,7 @@ class _SlideCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: data.gradient,
-        ),
+        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: data.gradient),
       ),
       padding: const EdgeInsets.fromLTRB(28, 28, 28, 36),
       child: Row(
@@ -502,26 +716,16 @@ class _SlideCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  data.title,
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.25),
-                ),
+                Text(data.title, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800, height: 1.25)),
                 const SizedBox(height: 10),
-                Text(
-                  data.subtitle,
-                  style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.55),
-                ),
+                Text(data.subtitle, style: const TextStyle(color: Colors.white70, fontSize: 13, height: 1.55)),
               ],
             ),
           ),
           const SizedBox(width: 20),
           Container(
-            width: 82,
-            height: 82,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
+            width: 82, height: 82,
+            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), shape: BoxShape.circle),
             child: Icon(data.icon, color: Colors.white, size: 42),
           ),
         ],
@@ -530,7 +734,9 @@ class _SlideCard extends StatelessWidget {
   }
 }
 
-// --- Flight path divider ---
+// ---------------------------------------------------------------------------
+// Search card sub-widgets
+// ---------------------------------------------------------------------------
 
 class _FlightPathDivider extends StatelessWidget {
   final bool isRoundTrip;
@@ -540,40 +746,16 @@ class _FlightPathDivider extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Expanded(
-          child: Container(
-            height: 1.5,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.divider, AppTheme.primary.withValues(alpha: 0.4)],
-              ),
-            ),
-          ),
-        ),
+        Expanded(child: Container(height: 1.5, decoration: BoxDecoration(gradient: LinearGradient(colors: [AppTheme.divider, AppTheme.primary.withValues(alpha: 0.4)])))),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10),
-          child: Icon(
-            isRoundTrip ? Icons.swap_horiz_rounded : Icons.flight_rounded,
-            color: AppTheme.primary,
-            size: 22,
-          ),
+          child: Icon(isRoundTrip ? Icons.swap_horiz_rounded : Icons.flight_rounded, color: AppTheme.primary, size: 22),
         ),
-        Expanded(
-          child: Container(
-            height: 1.5,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.primary.withValues(alpha: 0.4), AppTheme.divider],
-              ),
-            ),
-          ),
-        ),
+        Expanded(child: Container(height: 1.5, decoration: BoxDecoration(gradient: LinearGradient(colors: [AppTheme.primary.withValues(alpha: 0.4), AppTheme.divider])))),
       ],
     );
   }
 }
-
-// --- Sub-widgets ---
 
 class _TripChip extends StatelessWidget {
   final String label;
@@ -592,14 +774,7 @@ class _TripChip extends StatelessWidget {
           color: selected ? Colors.white : Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(20),
         ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: selected ? AppTheme.primaryDark : Colors.white70,
-          ),
-        ),
+        child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: selected ? AppTheme.primaryDark : Colors.white70)),
       ),
     );
   }
@@ -609,12 +784,13 @@ class _InfoTile extends StatelessWidget {
   final IconData icon;
   final String label, value;
   final Widget? trailing;
-  const _InfoTile({required this.icon, required this.label, required this.value, this.trailing});
+  final VoidCallback? onTap;
+  const _InfoTile({required this.icon, required this.label, required this.value, this.trailing, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {},
+      onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
