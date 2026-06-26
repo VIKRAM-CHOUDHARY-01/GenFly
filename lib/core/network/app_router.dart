@@ -12,7 +12,7 @@ import '../../features/profile/presentation/screens/profile_screen.dart';
 import '../../features/notifications/presentation/screens/notifications_screen.dart';
 
 // ---------------------------------------------------------------------------
-// Animated splash — airplane takeoff sequence
+// Splash screen — single seamless screen, matches native splash green exactly
 // ---------------------------------------------------------------------------
 
 class SplashScreen extends StatefulWidget {
@@ -23,74 +23,61 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
-  // Main timeline: logo fade-in, runway draw, plane roll + lift-off (2400ms)
+  // Main timeline: logo → text → plane (2200ms)
   late final AnimationController _main;
-  // Dots: repeat pulse independent of main (700ms)
+  // Dot pulse loop (independent)
   late final AnimationController _dots;
 
-  // Logo
+  // Logo: elastic scale-up from center (no slide — matches plain-green native splash)
+  late final Animation<double> _logoScale;
   late final Animation<double> _logoFade;
-  late final Animation<Offset> _logoSlide;
 
-  // "GenFly" text
+  // "GenFly" text slides in from right
   late final Animation<double> _textFade;
   late final Animation<Offset> _textSlide;
 
-  // Tagline
+  // Tagline fades in
   late final Animation<double> _tagFade;
 
-  // Runway
-  late final Animation<double> _runwayProgress;
-
-  // Airplane
-  late final Animation<double> _planeX;      // fraction of screen width, -0.7 → 1.8
-  late final Animation<double> _planeY;      // fraction of screen height, 0 → -0.4
-  late final Animation<double> _planeAngle;  // radians, 0 → -π/5
-  late final Animation<double> _planeScale;  // 1.0 → 1.5
-  late final Animation<double> _planeFade;   // 1.0 → 0.0 (exit fade)
+  // Plane sweeps diagonally across the screen
+  late final Animation<double> _planeProg; // 0→1 drives parametric position
+  late final Animation<double> _planeFade;
 
   @override
   void initState() {
     super.initState();
 
-    _main = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400));
-    _dots = AnimationController(vsync: this, duration: const Duration(milliseconds: 700))..repeat();
+    _main = AnimationController(vsync: this, duration: const Duration(milliseconds: 2200));
+    _dots = AnimationController(vsync: this, duration: const Duration(milliseconds: 750))..repeat();
 
-    _logoFade = _curved(_main, 0.0, 0.28, Curves.easeOut);
-    _logoSlide = Tween<Offset>(begin: const Offset(0, -0.25), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _main, curve: const Interval(0.0, 0.35, curve: Curves.easeOutCubic)));
+    // Logo pops in from center with elastic bounce
+    _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _main, curve: const Interval(0.0, 0.50, curve: Curves.elasticOut)));
+    _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _main, curve: const Interval(0.0, 0.18, curve: Curves.easeOut)));
 
-    _textFade = _curved(_main, 0.12, 0.40, Curves.easeOut);
-    _textSlide = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _main, curve: const Interval(0.12, 0.42, curve: Curves.easeOutCubic)));
+    // Brand name slides in from the right
+    _textFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _main, curve: const Interval(0.28, 0.50, curve: Curves.easeOut)));
+    _textSlide = Tween<Offset>(begin: const Offset(0.35, 0), end: Offset.zero).animate(
+      CurvedAnimation(parent: _main, curve: const Interval(0.28, 0.52, curve: Curves.easeOutCubic)));
 
-    _tagFade = _curved(_main, 0.38, 0.58, Curves.easeOut);
+    // Tagline
+    _tagFade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _main, curve: const Interval(0.46, 0.65, curve: Curves.easeOut)));
 
-    _runwayProgress = _curved(_main, 0.05, 0.48, Curves.easeOut);
-
-    // Plane rolls from left, lifts off, exits right
-    _planeX = Tween<double>(begin: -0.65, end: 1.75)
-        .animate(CurvedAnimation(parent: _main, curve: const Interval(0.10, 0.88, curve: Curves.easeInOut)));
-    _planeY = Tween<double>(begin: 0.0, end: -0.38)
-        .animate(CurvedAnimation(parent: _main, curve: const Interval(0.50, 0.88, curve: Curves.easeInCubic)));
-    _planeAngle = Tween<double>(begin: 0, end: -math.pi / 5)
-        .animate(CurvedAnimation(parent: _main, curve: const Interval(0.46, 0.70, curve: Curves.easeInOut)));
-    _planeScale = Tween<double>(begin: 1.0, end: 1.55)
-        .animate(CurvedAnimation(parent: _main, curve: const Interval(0.50, 0.88, curve: Curves.easeIn)));
-    _planeFade = Tween<double>(begin: 1.0, end: 0.0)
-        .animate(CurvedAnimation(parent: _main, curve: const Interval(0.80, 0.92, curve: Curves.easeIn)));
+    // Plane sweeps from bottom-left to top-right
+    _planeProg = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _main, curve: const Interval(0.12, 0.88, curve: Curves.easeInOut)));
+    _planeFade = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _main, curve: const Interval(0.80, 0.92, curve: Curves.easeIn)));
 
     _main.forward();
 
-    Future.delayed(const Duration(milliseconds: 3000), () {
+    Future.delayed(const Duration(milliseconds: 2900), () {
       if (mounted) context.go(AppRoutes.home);
     });
   }
-
-  static Animation<double> _curved(AnimationController ctrl, double start, double end, Curve curve) =>
-      Tween<double>(begin: 0, end: 1).animate(
-        CurvedAnimation(parent: ctrl, curve: Interval(start, end, curve: curve)),
-      );
 
   @override
   void dispose() {
@@ -107,6 +94,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       body: Container(
         width: double.infinity,
         height: double.infinity,
+        // Identical gradient to @color/splash_background — no visual seam
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -116,24 +104,66 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         ),
         child: Stack(
           children: [
-            // Subtle background clouds
-            ..._clouds(size),
+            // Faint background clouds for depth
+            ..._buildClouds(size),
 
-            // Center: logo image + brand name + tagline
-            Positioned.fill(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // App logo
-                  FadeTransition(
-                    opacity: _logoFade,
-                    child: SlideTransition(
-                      position: _logoSlide,
-                      child: Image.asset('assets/images/New_logo.png', height: 90, fit: BoxFit.contain),
+            // Animated airplane sweeping across
+            AnimatedBuilder(
+              animation: _main,
+              builder: (_, __) {
+                final t = _planeProg.value;
+                // Arc path: bottom-left → top-right with a slight upward bow
+                final x = (-0.55 + t * 2.2) * size.width;
+                final y = (0.72 - t * 0.60 - 0.18 * math.sin(t * math.pi)) * size.height;
+                // Tilt matches flight direction
+                const angle = -math.pi / 6.5;
+                return Positioned(
+                  left: x,
+                  top: y,
+                  child: Opacity(
+                    opacity: _planeFade.value.clamp(0.0, 1.0),
+                    child: Transform.rotate(
+                      angle: angle,
+                      child: Icon(
+                        Icons.flight_rounded,
+                        color: Colors.white.withValues(alpha: 0.9),
+                        size: 42,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 18),
-                  // Brand name
+                );
+              },
+            ),
+
+            // Plane contrail (trail of fading dots along arc)
+            AnimatedBuilder(
+              animation: _planeProg,
+              builder: (_, __) => CustomPaint(
+                size: size,
+                painter: _ContrailPainter(progress: _planeProg.value),
+              ),
+            ),
+
+            // Center: logo + brand name + tagline
+            Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Logo — scales from center, elastic bounce
+                  ScaleTransition(
+                    scale: _logoScale,
+                    child: FadeTransition(
+                      opacity: _logoFade,
+                      child: Image.asset(
+                        'assets/images/New_logo.png',
+                        height: 110,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+
+                  // "GenFly" slides in from right
                   FadeTransition(
                     opacity: _textFade,
                     child: SlideTransition(
@@ -142,60 +172,25 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                         'GenFly',
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 46,
+                          fontSize: 48,
                           fontWeight: FontWeight.w900,
-                          letterSpacing: 3,
+                          letterSpacing: 3.0,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 10),
+
                   // Tagline
                   FadeTransition(
                     opacity: _tagFade,
                     child: const Text(
                       'Fly Smart. Fly Easy.',
-                      style: TextStyle(color: Colors.white54, fontSize: 15, letterSpacing: 1.2),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Runway + airplane at lower third
-            Positioned(
-              bottom: size.height * 0.18,
-              left: 0,
-              right: 0,
-              height: 60,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Runway
-                  AnimatedBuilder(
-                    animation: _runwayProgress,
-                    builder: (_, __) => CustomPaint(
-                      size: Size(size.width, 60),
-                      painter: _RunwayPainter(progress: _runwayProgress.value),
-                    ),
-                  ),
-                  // Airplane
-                  AnimatedBuilder(
-                    animation: _main,
-                    builder: (_, __) => Transform.translate(
-                      offset: Offset(
-                        _planeX.value * size.width,
-                        _planeY.value * size.height,
-                      ),
-                      child: Transform.rotate(
-                        angle: _planeAngle.value,
-                        child: Transform.scale(
-                          scale: _planeScale.value,
-                          child: Opacity(
-                            opacity: _planeFade.value.clamp(0.0, 1.0),
-                            child: const Icon(Icons.flight_rounded, color: Colors.white, size: 44),
-                          ),
-                        ),
+                      style: TextStyle(
+                        color: Colors.white54,
+                        fontSize: 15,
+                        letterSpacing: 1.5,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ),
@@ -203,9 +198,9 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
               ),
             ),
 
-            // Pulsing loading dots at the very bottom
+            // Pulsing loading dots at the bottom
             Positioned(
-              bottom: 52,
+              bottom: 54,
               left: 0,
               right: 0,
               child: AnimatedBuilder(
@@ -214,7 +209,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(3, (i) {
                     final phase = ((_dots.value - i * 0.33) % 1.0).clamp(0.0, 1.0);
-                    final opacity = 0.25 + 0.75 * math.sin(phase * math.pi);
+                    final opacity = 0.20 + 0.80 * math.sin(phase * math.pi);
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 5),
                       width: 7,
@@ -234,67 +229,58 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     );
   }
 
-  List<Widget> _clouds(Size size) {
-    const data = [
-      (0.08, 0.12, 70.0, 0.05),
-      (0.68, 0.08, 90.0, 0.04),
-      (0.82, 0.28, 55.0, 0.06),
-      (0.12, 0.42, 65.0, 0.04),
-      (0.55, 0.38, 50.0, 0.05),
-      (0.35, 0.70, 80.0, 0.03),
+  List<Widget> _buildClouds(Size size) {
+    const specs = [
+      (0.06, 0.10, 80.0, 0.04),
+      (0.70, 0.07, 95.0, 0.035),
+      (0.80, 0.30, 60.0, 0.05),
+      (0.10, 0.45, 70.0, 0.03),
+      (0.50, 0.65, 55.0, 0.04),
+      (0.30, 0.80, 75.0, 0.03),
     ];
-    return data.map((d) {
-      final (dx, dy, sz, alpha) = d;
+    return specs.map((s) {
+      final (dx, dy, sz, alpha) = s;
       return Positioned(
         left: dx * size.width,
         top: dy * size.height,
-        child: Icon(Icons.cloud_rounded, size: sz, color: Colors.white.withValues(alpha: alpha)),
+        child: Icon(
+          Icons.cloud_rounded,
+          size: sz,
+          color: Colors.white.withValues(alpha: alpha),
+        ),
       );
     }).toList();
   }
 }
 
-// Draws runway: two side lines + dashed centre line that expand left→right
-class _RunwayPainter extends CustomPainter {
+// Draws the plane's fading contrail along the arc path
+class _ContrailPainter extends CustomPainter {
   final double progress;
-  const _RunwayPainter({required this.progress});
+  const _ContrailPainter({required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (progress == 0) return;
+    if (progress < 0.05) return;
 
-    final sidePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.2)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    final dashPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.35)
-      ..strokeWidth = 2.0
-      ..style = PaintingStyle.stroke;
-
-    const startX = 0.0;
-    final endX = size.width * progress;
-    final midY = size.height / 2;
-    const laneH = 14.0;
-
-    // Side rails
-    canvas.drawLine(Offset(startX, midY - laneH), Offset(endX, midY - laneH), sidePaint);
-    canvas.drawLine(Offset(startX, midY + laneH), Offset(endX, midY + laneH), sidePaint);
-
-    // Dashed centre line
-    const dashLen = 18.0;
-    const gapLen = 10.0;
-    double x = startX;
-    while (x < endX) {
-      final ex = math.min(x + dashLen, endX);
-      canvas.drawLine(Offset(x, midY), Offset(ex, midY), dashPaint);
-      x += dashLen + gapLen;
+    // Draw ~12 fading dots behind the current plane position
+    const trailCount = 12;
+    for (int i = 1; i <= trailCount; i++) {
+      final t = (progress - i * 0.028).clamp(0.0, 1.0);
+      if (t <= 0) break;
+      final x = (-0.55 + t * 2.2) * size.width + 21; // +21 centres on icon
+      final y = (0.72 - t * 0.60 - 0.18 * math.sin(t * math.pi)) * size.height + 21;
+      final alpha = (1 - i / trailCount) * 0.22 * progress;
+      final radius = (1 - i / trailCount) * 3.5;
+      canvas.drawCircle(
+        Offset(x, y),
+        radius,
+        Paint()..color = Colors.white.withValues(alpha: alpha.clamp(0.0, 1.0)),
+      );
     }
   }
 
   @override
-  bool shouldRepaint(_RunwayPainter old) => old.progress != progress;
+  bool shouldRepaint(_ContrailPainter old) => old.progress != progress;
 }
 
 // ---------------------------------------------------------------------------

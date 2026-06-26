@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       // App logo: clipped to a rounded square so background square disappears
       title: Image.asset(
         'assets/images/New_logo.png',
-        height: 38,
+        height: 46,
         fit: BoxFit.contain,
       ),
       centerTitle: false,
