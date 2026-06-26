@@ -265,7 +265,8 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> {
                 Expanded(
                   child: _HelpButton(
                     label: 'WhatsApp',
-                    icon: Icons.chat_rounded,
+                    icon: Icons.chat_rounded, // overridden by leadingWidget below
+                    leadingWidget: const _ChatBubbleIcon(size: 20),
                     color: const Color(0xFF25D366),
                     onTap: _openWhatsApp,
                   ),
@@ -517,7 +518,15 @@ class _HelpButton extends StatelessWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
-  const _HelpButton({required this.label, required this.icon, required this.color, required this.onTap});
+  final Widget? leadingWidget;
+
+  const _HelpButton({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.leadingWidget,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -534,13 +543,84 @@ class _HelpButton extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 17),
+          leadingWidget ?? Icon(icon, size: 17),
           const SizedBox(width: 6),
           Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
         ],
       ),
     );
   }
+}
+
+// Speech bubble icon — proper chat bubble with tail, clearly reads as messaging
+class _ChatBubbleIcon extends StatelessWidget {
+  final double size;
+  const _ChatBubbleIcon({this.size = 20});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: Size(size, size),
+      painter: _ChatBubblePainter(),
+    );
+  }
+}
+
+class _ChatBubblePainter extends CustomPainter {
+  const _ChatBubblePainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final paint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+
+    // Body of the bubble occupies top 78% of the bounding box
+    final bodyH = h * 0.78;
+    const r = 3.5; // corner radius
+
+    final path = Path()
+      // top-left corner
+      ..moveTo(r, 0)
+      // top edge → top-right corner
+      ..lineTo(w - r, 0)
+      ..arcToPoint(Offset(w, r), radius: const Radius.circular(r))
+      // right edge → bottom-right corner
+      ..lineTo(w, bodyH - r)
+      ..arcToPoint(Offset(w - r, bodyH), radius: const Radius.circular(r))
+      // bottom edge, right side → start of tail
+      ..lineTo(w * 0.38, bodyH)
+      // tail: curves down-left then back up (classic WhatsApp-style tail)
+      ..quadraticBezierTo(w * 0.20, bodyH + 1, w * 0.14, h)
+      ..quadraticBezierTo(w * 0.10, bodyH, r, bodyH)
+      // bottom edge, left side → bottom-left corner
+      ..arcToPoint(Offset(0, bodyH - r), radius: const Radius.circular(r))
+      // left edge → top-left corner
+      ..lineTo(0, r)
+      ..arcToPoint(Offset(r, 0), radius: const Radius.circular(r))
+      ..close();
+
+    canvas.drawPath(path, paint);
+
+    // Three dots inside the bubble to represent a chat/typing indicator
+    final dotPaint = Paint()
+      ..color = const Color(0xFF25D366)
+      ..style = PaintingStyle.fill;
+    const dotR = 1.4;
+    final dotY = bodyH * 0.52;
+    for (int i = 0; i < 3; i++) {
+      canvas.drawCircle(
+        Offset(w * (0.28 + i * 0.22), dotY),
+        dotR,
+        dotPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ChatBubblePainter old) => false;
 }
 
 class _FlightData {
