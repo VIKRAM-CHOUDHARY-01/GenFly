@@ -13,43 +13,62 @@ import '../../features/notifications/presentation/screens/notifications_screen.d
 import '../../features/search/presentation/screens/search_results_screen.dart';
 import '../../features/search/presentation/screens/flight_comparison_screen.dart';
 
+// Root navigator key — required so routes pushed from inside StatefulShellRoute
+// are placed on the root navigator, not the branch's sub-navigator.
+final GlobalKey<NavigatorState> _rootNavKey =
+    GlobalKey<NavigatorState>(debugLabel: 'root');
+
 // ---------------------------------------------------------------------------
-// Plane physics helpers — used by both the icon widget and the contrail painter
+// Plane position helpers — shared between the plane icon and contrail painter
 // ---------------------------------------------------------------------------
 
-// Phase 0–0.44: runway roll — plane accelerates horizontally (easeIn)
-// Phase 0.44–1.0: airborne — constant horizontal speed
-// Ground level: 73% from top of screen
+// X: accelerates from off-screen left along the runway, then constant speed
 double _planeX(double t, double w) {
-  if (t < 0.44) {
-    return (-0.50 + Curves.easeIn.transform(t / 0.44) * 0.95) * w;
+  if (t < 0.38) {
+    return (-0.55 + Curves.easeIn.transform(t / 0.38) * 1.00) * w;
   }
-  return (0.45 + ((t - 0.44) / 0.56) * 1.30) * w;
+  return (0.45 + ((t - 0.38) / 0.62) * 1.45) * w;
 }
 
+// Y: stays at ground level until liftoff, then climbs smoothly
 double _planeY(double t, double h) {
-  const groundFrac = 0.73;
-  if (t < 0.52) return groundFrac * h;
-  // easeOut: fast initial climb (steep nose-up), then levels off
-  final ct = (t - 0.52) / 0.48;
-  return (groundFrac - Curves.easeOut.transform(ct) * 0.62) * h;
+  const g = 0.72; // ground level: 72% from top
+  if (t < 0.50) return g * h;
+  final ct = (t - 0.50) / 0.50;
+  // easeInOut: gentle start to liftoff, smooth level-off at top
+  return (g - Curves.easeInOut.transform(ct) * 0.60) * h;
 }
 
-// Angle is computed from instantaneous velocity so the nose ALWAYS points
-// where the plane is actually going. Icons.flight_rounded default = NE (45°),
-// so Flutter rotation r = π/4 − θ where θ is velocity direction from east.
-double _planeAngle(double t, double w, double h) {
-  const dt = 0.008;
-  final t1 = (t + dt).clamp(0.0, 0.994);
-  final dx = _planeX(t1, w) - _planeX(t, w);
-  final dy = _planeY(t1, h) - _planeY(t, h);
-  if (dx.abs() < 0.1) return math.pi / 4;
-  // atan2(-dy, dx): screen y is inverted so negate dy to get standard math angle
-  return math.pi / 4 - math.atan2(-dy, dx);
+// Angle: hand-crafted 3-phase curve for a visually correct takeoff
+//
+//   Icons.flight_rounded default = NE (upper-right, 45° from horizontal).
+//   Flutter rotation r: positive = clockwise.
+//   Direction = 45° − r_degrees from horizontal.
+//
+//   r = π/4  → plane points East  (0°, level) — runway roll
+//   r = 0    → plane points NE   (45°)        — moderate climb
+//   r ≈ −0.2 → plane points ~55° above horizontal — steep liftoff climb
+double _planeAngle(double t) {
+  // Phase 1: runway roll — nose level, pointing right
+  if (t <= 0.36) return math.pi / 4;
+
+  // Phase 2: nose pitches UP — from level (π/4) to steep climb (-0.18 rad ≈ 55°)
+  if (t <= 0.54) {
+    final pt = Curves.easeInOut.transform((t - 0.36) / 0.18);
+    return math.pi / 4 + (-0.18 - math.pi / 4) * pt;
+    // at pt=0: π/4 (level)   at pt=1: -0.18 (steeply pitched up)
+  }
+
+  // Phase 3: steady climb at ~55°
+  if (t <= 0.78) return -0.18;
+
+  // Phase 4: gradually level off as plane exits screen
+  final lt = Curves.easeOut.transform((t - 0.78) / 0.22);
+  return -0.18 + lt * (math.pi / 4 + 0.18); // returns toward π/4
 }
 
 // ---------------------------------------------------------------------------
-// Splash screen — single seamless screen, matches native splash green exactly
+// Splash screen
 // ---------------------------------------------------------------------------
 
 class SplashScreen extends StatefulWidget {
@@ -59,59 +78,65 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
-  // Main timeline: logo → text → plane (2200ms)
+class _SplashScreenState extends State<SplashScreen>
+    with TickerProviderStateMixin {
   late final AnimationController _main;
-  // Dot pulse loop (independent)
   late final AnimationController _dots;
 
-  // Logo: elastic scale-up from center (no slide — matches plain-green native splash)
   late final Animation<double> _logoScale;
   late final Animation<double> _logoFade;
-
-  // "GenFly" text slides in from right
   late final Animation<double> _textFade;
   late final Animation<Offset> _textSlide;
-
-  // Tagline fades in
   late final Animation<double> _tagFade;
-
-  // Plane sweeps diagonally across the screen
-  late final Animation<double> _planeProg; // 0→1 drives parametric position
+  late final Animation<double> _planeProg;
   late final Animation<double> _planeFade;
 
   @override
   void initState() {
     super.initState();
 
-    _main = AnimationController(vsync: this, duration: const Duration(milliseconds: 3200));
-    _dots = AnimationController(vsync: this, duration: const Duration(milliseconds: 750))..repeat();
+    // Slightly shorter total — snappier feel
+    _main = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2800));
+    _dots = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 700))
+      ..repeat();
 
-    // Logo pops in from center with elastic bounce
+    // Logo: elastic pop starting from frame 0 — no blank green gap
     _logoScale = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _main, curve: const Interval(0.0, 0.50, curve: Curves.elasticOut)));
+        CurvedAnimation(
+            parent: _main,
+            curve: const Interval(0.0, 0.48, curve: Curves.elasticOut)));
     _logoFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _main, curve: const Interval(0.0, 0.18, curve: Curves.easeOut)));
+        CurvedAnimation(
+            parent: _main,
+            curve: const Interval(0.0, 0.16, curve: Curves.easeOut)));
 
-    // Brand name slides in from the right
     _textFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _main, curve: const Interval(0.28, 0.50, curve: Curves.easeOut)));
-    _textSlide = Tween<Offset>(begin: const Offset(0.35, 0), end: Offset.zero).animate(
-      CurvedAnimation(parent: _main, curve: const Interval(0.28, 0.52, curve: Curves.easeOutCubic)));
+        CurvedAnimation(
+            parent: _main,
+            curve: const Interval(0.26, 0.46, curve: Curves.easeOut)));
+    _textSlide =
+        Tween<Offset>(begin: const Offset(0.35, 0), end: Offset.zero).animate(
+            CurvedAnimation(
+                parent: _main,
+                curve: const Interval(0.26, 0.48, curve: Curves.easeOutCubic)));
 
-    // Tagline
-    _tagFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _main, curve: const Interval(0.46, 0.65, curve: Curves.easeOut)));
+    _tagFade = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
+        parent: _main,
+        curve: const Interval(0.42, 0.60, curve: Curves.easeOut)));
 
-    // Plane drives takeoff physics: linear t, all easing is inside _planeX/_planeY/_planeAngle
+    // Plane starts at t=0: runway is visible from the very first Flutter frame
     _planeProg = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _main, curve: const Interval(0.10, 0.90)));
+        CurvedAnimation(parent: _main, curve: const Interval(0.0, 0.88)));
     _planeFade = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _main, curve: const Interval(0.82, 0.94, curve: Curves.easeIn)));
+        CurvedAnimation(
+            parent: _main,
+            curve: const Interval(0.78, 0.90, curve: Curves.easeIn)));
 
     _main.forward();
 
-    Future.delayed(const Duration(milliseconds: 4000), () {
+    Future.delayed(const Duration(milliseconds: 3300), () {
       if (mounted) context.go(AppRoutes.home);
     });
   }
@@ -131,7 +156,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        // Identical gradient to @color/splash_background — no visual seam
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
@@ -141,24 +165,29 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
         ),
         child: Stack(
           children: [
-            // Faint background clouds for depth
             ..._buildClouds(size),
 
-            // Animated airplane — runs physics-correct takeoff
+            // Contrail behind the plane
+            AnimatedBuilder(
+              animation: _planeProg,
+              builder: (_, __) => CustomPaint(
+                size: size,
+                painter: _ContrailPainter(progress: _planeProg.value),
+              ),
+            ),
+
+            // Animated airplane
             AnimatedBuilder(
               animation: _main,
               builder: (_, __) {
                 final t = _planeProg.value;
-                final x = _planeX(t, size.width);
-                final y = _planeY(t, size.height);
-                final angle = _planeAngle(t, size.width, size.height);
                 return Positioned(
-                  left: x,
-                  top: y,
+                  left: _planeX(t, size.width),
+                  top: _planeY(t, size.height),
                   child: Opacity(
                     opacity: _planeFade.value.clamp(0.0, 1.0),
                     child: Transform.rotate(
-                      angle: angle,
+                      angle: _planeAngle(t),
                       child: Icon(
                         Icons.flight_rounded,
                         color: Colors.white.withValues(alpha: 0.92),
@@ -170,21 +199,11 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
               },
             ),
 
-            // Plane contrail (trail of fading dots along arc)
-            AnimatedBuilder(
-              animation: _planeProg,
-              builder: (_, __) => CustomPaint(
-                size: size,
-                painter: _ContrailPainter(progress: _planeProg.value),
-              ),
-            ),
-
-            // Center: logo + brand name + tagline
+            // Center content: logo + brand name + tagline
             Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Logo — scales from center, elastic bounce
                   ScaleTransition(
                     scale: _logoScale,
                     child: FadeTransition(
@@ -197,8 +216,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // "GenFly" slides in from right
                   FadeTransition(
                     opacity: _textFade,
                     child: SlideTransition(
@@ -215,8 +232,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                     ),
                   ),
                   const SizedBox(height: 10),
-
-                  // Tagline
                   FadeTransition(
                     opacity: _tagFade,
                     child: const Text(
@@ -233,7 +248,7 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
               ),
             ),
 
-            // Pulsing loading dots at the bottom
+            // Pulsing dots
             Positioned(
               bottom: 54,
               left: 0,
@@ -243,7 +258,8 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
                 builder: (_, __) => Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(3, (i) {
-                    final phase = ((_dots.value - i * 0.33) % 1.0).clamp(0.0, 1.0);
+                    final phase =
+                        ((_dots.value - i * 0.33) % 1.0).clamp(0.0, 1.0);
                     final opacity = 0.20 + 0.80 * math.sin(phase * math.pi);
                     return Container(
                       margin: const EdgeInsets.symmetric(horizontal: 5),
@@ -278,34 +294,33 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
       return Positioned(
         left: dx * size.width,
         top: dy * size.height,
-        child: Icon(
-          Icons.cloud_rounded,
-          size: sz,
-          color: Colors.white.withValues(alpha: alpha),
-        ),
+        child: Icon(Icons.cloud_rounded,
+            size: sz, color: Colors.white.withValues(alpha: alpha)),
       );
     }).toList();
   }
 }
 
-// Draws the plane's fading contrail — uses the same physics as the plane icon
+// ---------------------------------------------------------------------------
+// Contrail painter
+// ---------------------------------------------------------------------------
+
 class _ContrailPainter extends CustomPainter {
   final double progress;
   const _ContrailPainter({required this.progress});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (progress < 0.04) return;
-
+    if (progress < 0.03) return;
     const trailCount = 14;
-    const iconHalf = 22.0; // half of icon size (44px) to centre the dot on the icon
+    const iconHalf = 22.0;
     for (int i = 1; i <= trailCount; i++) {
       final t = (progress - i * 0.025).clamp(0.0, 1.0);
       if (t <= 0) break;
       final x = _planeX(t, size.width) + iconHalf;
       final y = _planeY(t, size.height) + iconHalf;
-      final alpha = (1 - i / trailCount) * 0.20 * progress;
-      final radius = (1 - i / trailCount) * 3.0;
+      final alpha = (1 - i / trailCount) * 0.22 * progress;
+      final radius = (1 - i / trailCount) * 3.2;
       canvas.drawCircle(
         Offset(x, y),
         radius,
@@ -322,7 +337,8 @@ class _ContrailPainter extends CustomPainter {
 // Page transitions
 // ---------------------------------------------------------------------------
 
-Page<T> _fadeSlidePage<T>({required Widget child, required GoRouterState state}) {
+Page<T> _fadeSlidePage<T>(
+    {required Widget child, required GoRouterState state}) {
   return CustomTransitionPage<T>(
     key: state.pageKey,
     child: child,
@@ -330,30 +346,39 @@ Page<T> _fadeSlidePage<T>({required Widget child, required GoRouterState state})
     reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final fade = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-      final slide = Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero)
-          .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
-      final fadeSec = Tween<double>(begin: 1.0, end: 0.92)
-          .animate(CurvedAnimation(parent: secondaryAnimation, curve: Curves.easeInCubic));
+      final slide =
+          Tween<Offset>(begin: const Offset(0, 0.06), end: Offset.zero).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+      final fadeSec = Tween<double>(begin: 1.0, end: 0.92).animate(
+          CurvedAnimation(
+              parent: secondaryAnimation, curve: Curves.easeInCubic));
       return FadeTransition(
         opacity: fadeSec,
-        child: FadeTransition(opacity: fade, child: SlideTransition(position: slide, child: child)),
+        child: FadeTransition(
+            opacity: fade,
+            child: SlideTransition(position: slide, child: child)),
       );
     },
   );
 }
 
-Page<T> _slideRightPage<T>({required Widget child, required GoRouterState state}) {
+Page<T> _slideRightPage<T>(
+    {required Widget child, required GoRouterState state}) {
   return CustomTransitionPage<T>(
     key: state.pageKey,
     child: child,
     transitionDuration: const Duration(milliseconds: 320),
     reverseTransitionDuration: const Duration(milliseconds: 280),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final slideIn = Tween<Offset>(begin: const Offset(1.0, 0), end: Offset.zero)
-          .animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
-      final fadeSec = Tween<double>(begin: 1.0, end: 0.92)
-          .animate(CurvedAnimation(parent: secondaryAnimation, curve: Curves.easeInCubic));
-      return FadeTransition(opacity: fadeSec, child: SlideTransition(position: slideIn, child: child));
+      final slideIn =
+          Tween<Offset>(begin: const Offset(1.0, 0), end: Offset.zero).animate(
+              CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
+      final fadeSec = Tween<double>(begin: 1.0, end: 0.92).animate(
+          CurvedAnimation(
+              parent: secondaryAnimation, curve: Curves.easeInCubic));
+      return FadeTransition(
+          opacity: fadeSec,
+          child: SlideTransition(position: slideIn, child: child));
     },
   );
 }
@@ -363,19 +388,27 @@ Page<T> _slideRightPage<T>({required Widget child, required GoRouterState state}
 // ---------------------------------------------------------------------------
 
 final GoRouter appRouter = GoRouter(
+  navigatorKey: _rootNavKey,
   initialLocation: AppRoutes.splash,
   debugLogDiagnostics: false,
   routes: [
+    // Splash — no parentNavigatorKey needed (runs before shell exists)
     GoRoute(
       path: AppRoutes.splash,
-      pageBuilder: (context, state) => _fadeSlidePage(child: const SplashScreen(), state: state),
+      pageBuilder: (context, state) =>
+          _fadeSlidePage(child: const SplashScreen(), state: state),
     ),
+
+    // Full-screen routes pushed from inside the shell — MUST use root navigator
     GoRoute(
       path: AppRoutes.notifications,
-      pageBuilder: (context, state) => _slideRightPage(child: const NotificationsScreen(), state: state),
+      parentNavigatorKey: _rootNavKey,
+      pageBuilder: (context, state) =>
+          _slideRightPage(child: const NotificationsScreen(), state: state),
     ),
     GoRoute(
       path: AppRoutes.searchResults,
+      parentNavigatorKey: _rootNavKey,
       pageBuilder: (context, state) {
         final e = (state.extra as Map<String, String>?) ?? {};
         return _slideRightPage(
@@ -393,6 +426,7 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: AppRoutes.flightComparison,
+      parentNavigatorKey: _rootNavKey,
       pageBuilder: (context, state) {
         final e = (state.extra as Map<String, String>?) ?? {};
         return _slideRightPage(
@@ -414,37 +448,45 @@ final GoRouter appRouter = GoRouter(
         );
       },
     ),
+
+    // Bottom-nav shell
     StatefulShellRoute.indexedStack(
-      builder: (context, state, navigationShell) => MainScaffold(navigationShell: navigationShell),
+      builder: (context, state, navigationShell) =>
+          MainScaffold(navigationShell: navigationShell),
       branches: [
         StatefulShellBranch(routes: [
           GoRoute(
             path: AppRoutes.home,
-            pageBuilder: (context, state) => _fadeSlidePage(child: const HomeScreen(), state: state),
+            pageBuilder: (context, state) =>
+                _fadeSlidePage(child: const HomeScreen(), state: state),
           ),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(
             path: AppRoutes.bookings,
-            pageBuilder: (context, state) => _fadeSlidePage(child: const BookingsScreen(), state: state),
+            pageBuilder: (context, state) =>
+                _fadeSlidePage(child: const BookingsScreen(), state: state),
           ),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(
             path: AppRoutes.offers,
-            pageBuilder: (context, state) => _fadeSlidePage(child: const OffersScreen(), state: state),
+            pageBuilder: (context, state) =>
+                _fadeSlidePage(child: const OffersScreen(), state: state),
           ),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(
             path: AppRoutes.support,
-            pageBuilder: (context, state) => _fadeSlidePage(child: const SupportScreen(), state: state),
+            pageBuilder: (context, state) =>
+                _fadeSlidePage(child: const SupportScreen(), state: state),
           ),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(
             path: AppRoutes.profile,
-            pageBuilder: (context, state) => _fadeSlidePage(child: const ProfileScreen(), state: state),
+            pageBuilder: (context, state) =>
+                _fadeSlidePage(child: const ProfileScreen(), state: state),
           ),
         ]),
       ],

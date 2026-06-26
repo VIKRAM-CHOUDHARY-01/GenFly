@@ -192,13 +192,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       pinned: true,
       backgroundColor: AppTheme.primaryDark,
       elevation: 0,
+      toolbarHeight: 72,
       leading: Builder(
         builder: (ctx) => IconButton(
           icon: const Icon(Icons.menu_rounded, color: Colors.white),
           onPressed: () => Scaffold.of(ctx).openDrawer(),
         ),
       ),
-      title: Image.asset('assets/images/New_logo.png', height: 56, fit: BoxFit.contain),
+      title: Image.asset('assets/images/New_logo.png', height: 64, fit: BoxFit.contain),
       centerTitle: false,
       actions: [
         IconButton(
