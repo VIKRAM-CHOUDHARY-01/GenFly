@@ -32,10 +32,10 @@ final GlobalKey<NavigatorState> _rootNavKey =
 //
 // Icons.flight_rounded default = NE = atan2(−1, 1) = −π/4.
 // Flutter rotation θ (positive = clockwise): icon direction = −π/4 + θ
-// For icon to point at α: −π/4 + θ = α  →  θ = α + π/4
+// For icon to point at angle a: -pi/4 + theta = a  =>  theta = a + pi/4
 //
-// This formula is exact for any α — the nose always points tangent to the circle.
-double _orbitAngle(double α) => α + math.pi / 4;
+// This formula is exact for any a — the nose always points tangent to the circle.
+double _orbitAngle(double a) => a + math.pi / 4;
 
 // ---------------------------------------------------------------------------
 // Splash screen
@@ -146,7 +146,7 @@ class _SplashScreenState extends State<SplashScreen>
                 if (progress <= 0) return const SizedBox.shrink();
 
                 // 1.5 revolutions over the visible window
-                final α = 3 * math.pi * progress;
+                final a = 3 * math.pi * progress;
                 final cx = size.width / 2;
                 final cy = size.height / 2;
                 const r = 130.0;
@@ -161,12 +161,12 @@ class _SplashScreenState extends State<SplashScreen>
                         : 1.0;
 
                 return Positioned(
-                  left: cx + r * math.sin(α) - iconHalf,
-                  top: cy - r * math.cos(α) - iconHalf,
+                  left: cx + r * math.sin(a) - iconHalf,
+                  top: cy - r * math.cos(a) - iconHalf,
                   child: Opacity(
                     opacity: opacity,
                     child: Transform.rotate(
-                      angle: _orbitAngle(α),
+                      angle: _orbitAngle(a),
                       child: Icon(
                         Icons.flight_rounded,
                         color: Colors.white.withValues(alpha: 0.92),
